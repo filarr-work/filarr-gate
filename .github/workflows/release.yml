@@ -198,9 +198,10 @@ jobs:
       - name: Publier les archives construites et comparées (@filarr/gate puis filarr-gate)
         env:
           VERSION: ${{ needs.verify.outputs.version }}
-          # Vide : publication de confiance (OIDC). Le secret NPM_TOKEN ne sert qu'à la toute première publication,
-          # avant que la publication de confiance puisse être réglée sur npm ; on le retire ensuite.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Publication de confiance (OIDC) SEULE : aucun jeton n'est passé. Un jeton, même périmé, faisait répondre
+          # npm 404 (« tokens that bypass 2FA are being restricted »), 0.3.0, 2026-10-16. Si l'échange OIDC échoue,
+          # vérifier sur npmjs.com › paquet › Settings › Trusted Publisher : filarr-work / filarr-gate / release.yml /
+          # release, exactement.
         run: |
           for pair in "@filarr/gate:release/a/library" "filarr-gate:release/a/cli"; do
             name="${pair%%:*}"; dir="${pair#*:}"

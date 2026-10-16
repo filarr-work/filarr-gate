@@ -79,14 +79,14 @@ ssh-keygen -t ed25519 -C "filarr-gate security" -f ~/.ssh/filarr-gate-security
    `from '@filarr/gate'` de la documentation, des exemples (`examples/library-node`) et des README. Ce que la
    bibliothèque annonce à Filarr (`lib-<version>`) ne change pas, et la commande `filarr-gate`, sans portée, garde son
    nom. Les applis Filarr affichent `npm install @filarr/gate` : leur texte change aussi.
-2. **Première publication seulement** : la publication de confiance se règle sur un paquet qui existe. Créez un jeton
-   d'accès granulaire (lecture et écriture, paquets `@filarr/gate` et `filarr-gate` ou tous les nouveaux paquets,
-   expiration de quelques jours) et rangez-le dans le secret `NPM_TOKEN` de l'environnement `release`. La chaîne
-   publie quand même avec `--provenance`.
-3. Après la première publication, pour **chacun** des deux paquets : **Settings › Trusted Publisher › GitHub
-   Actions**, organisation `filarr-work` (le propriétaire du dépôt), dépôt `filarr-gate`, workflow
-   `release.yml`, environnement `release`. Supprimez ensuite le secret `NPM_TOKEN`, révoquez le jeton, et réglez
-   **Publishing access** sur « Require two-factor authentication and disallow tokens ».
+2. **Première publication seulement** (faite pour la 0.2.0) : la publication de confiance se règle sur un paquet qui
+   existe. Le mainteneur publie donc la première fois depuis son poste les archives que la chaîne a construites
+   (artefact `release` de l'exécution, empreintes comparées à `SHA256SUMS`), `npm publish <archive> --access public`
+   avec son code de double authentification, puis approuve la publication en deux temps sur npmjs.com.
+3. Ensuite, pour **chacun** des deux paquets : **Settings › Trusted Publisher › GitHub Actions**, organisation
+   `filarr-work` (le propriétaire du dépôt), dépôt `filarr-gate`, workflow `release.yml`, environnement `release`,
+   EXACTEMENT ; **Publishing access** sur « Require two-factor authentication and disallow tokens ». La chaîne ne
+   passe AUCUN jeton : un jeton, même périmé, fait répondre npm 404. Aucun secret `NPM_TOKEN` ne doit exister.
 
 ### 6. GHCR : l'image, puis un paquet public
 

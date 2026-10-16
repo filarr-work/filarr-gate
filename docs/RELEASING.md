@@ -73,13 +73,14 @@ ssh-keygen -t ed25519 -C "filarr-gate security" -f ~/.ssh/filarr-gate-security
    `from '@filarr/gate'` of the documentation, the examples (`examples/library-node`) and the READMEs. What the
    library reports to Filarr (`lib-<version>`) does not change, and the command `filarr-gate`, unscoped, keeps its
    name. Filarr's apps show `npm install @filarr/gate`: their text changes too.
-2. **First publication only**: trusted publishing can be set on a package that exists. Create a granular access token
-   (read and write, packages `@filarr/gate` and `filarr-gate` or all new packages, expiry of a few days) and store it
-   as the secret `NPM_TOKEN` of the `release` environment. The chain still publishes with `--provenance`.
-3. After the first release, for **each** of the two packages: **Settings › Trusted Publisher › GitHub Actions**,
-   organisation `filarr-work` (the owner of the repository), repository `filarr-gate`, workflow
-   `release.yml`, environment `release`. Then delete the `NPM_TOKEN` secret, revoke the token, and set **Publishing
-   access** to "Require two-factor authentication and disallow tokens".
+2. **First publication only** (done for 0.2.0): trusted publishing can be set on a package that exists. The
+   maintainer therefore publishes the first time from their machine the archives the chain built (the run's `release`
+   artifact, hashes compared with `SHA256SUMS`), `npm publish <archive> --access public` with their two-factor code,
+   then approves the staged publish on npmjs.com.
+3. Then, for **each** of the two packages: **Settings › Trusted Publisher › GitHub Actions**, organisation
+   `filarr-work` (the owner of the repository), repository `filarr-gate`, workflow `release.yml`, environment
+   `release`, EXACTLY; **Publishing access** set to "Require two-factor authentication and disallow tokens". The chain
+   passes NO token: a token, even an expired one, makes npm answer 404. No `NPM_TOKEN` secret may exist.
 
 ### 6. GHCR: the image, then a public package
 
