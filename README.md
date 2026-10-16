@@ -6,7 +6,7 @@
 
 [Lire en français](README.fr.md)
 
-> **0.3.0** ([changes](CHANGELOG.md)), on npm (`@filarr/gate`, `filarr-gate`) and on GHCR
+> **0.3.1** ([changes](CHANGELOG.md)), on npm (`@filarr/gate`, `filarr-gate`) and on GHCR
 > (`ghcr.io/filarr-work/gate`). The gate implements the frozen contracts `api-base-1` (revisions 2 and 3), `db-store-1`
 > (3.9), `gate-fichiers-1`, `source-externe-1` and the settings package of `gate-heberge-1`, and is tested end to end
 > against a local Filarr server (reads, live changes, writes, revocation, an external PostgreSQL sync, a file deposit,

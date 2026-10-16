@@ -23,7 +23,7 @@ service only through the release chain.
 
 One version for the whole repository, set by the maintainer only, in `packages/gate/package.json`,
 `packages/cli/package.json` (and the private packages, to keep them aligned). The library reports it as
-`lib-<version>` to Filarr, the server as `<version>`. This release: **0.3.0**.
+`lib-<version>` to Filarr, the server as `<version>`. This release: **0.3.1**.
 
 ## Before tagging
 
@@ -75,7 +75,7 @@ All of it is `.github/workflows/release.yml`; the step-by-step procedure for the
 
 ## Names
 
-- **Image.** `ghcr.io/filarr-work/gate`: `:0.3.0`, `:0.3` (follows the 0.3.x fixes) and `latest`; `:<major>` from
+- **Image.** `ghcr.io/filarr-work/gate`: `:0.3.1`, `:0.3` (follows the 0.3.x fixes) and `latest`; `:<major>` from
   1.0 on.
 - **Volume.** `/data`, as in the Filarr app.
 - **npm.** `@filarr/gate` (the library) and `filarr-gate` (the command). If the scope ever changes, what to rename:

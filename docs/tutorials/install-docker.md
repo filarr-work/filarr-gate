@@ -13,7 +13,7 @@ will know how to update it and back it up.
 - A Linux server with Docker and the Compose plugin (`docker compose version`).
 - A DNS name pointing at the server (`gate.example.com` below) and ports 80 and 443 open, for the certificate.
 - The token `flr_live_…` of the access ([open a database to an API](open-a-database.md)).
-- The image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64): `:0.3` follows the 0.3.x fixes, `:0.3.0` pins
+- The image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64): `:0.3` follows the 0.3.x fixes, `:0.3.1` pins
   this exact version. It is small (Node 22, Alpine), runs as the non-root user `node`, keeps everything in `/data`, and
   checks its own health. It is signed (cosign) and built by the repository's release chain
   ([release plan](../release.md)).
@@ -23,7 +23,7 @@ will know how to update it and back it up.
 ```sh
 mkdir filarr-gate && cd filarr-gate
 for f in docker-compose.yml Caddyfile example.env; do
-  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.3.0/examples/docker/$f"
+  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.3.1/examples/docker/$f"
 done
 cp example.env .env
 chmod 600 .env
@@ -48,7 +48,7 @@ Given this way, the token is never written to the volume; it lives in `.env`, re
 <!-- snippet: examples/docker/docker-compose.yml#gate -->
 ```yaml
 gate:
-  # `:0.3` follows the 0.3.x fixes; `:0.3.0` pins this exact version.
+  # `:0.3` follows the 0.3.x fixes; `:0.3.1` pins this exact version.
   image: ghcr.io/filarr-work/gate:0.3
   # Variant, from a clone of the repository: replace the line above with
   #   build:
@@ -194,7 +194,7 @@ From a clone of this repository, the same image as the published one:
 
 ```sh
 git clone https://github.com/filarr-work/filarr-gate.git && cd filarr-gate
-git checkout v0.3.0
+git checkout v0.3.1
 docker build -t filarr-gate:local .
 ```
 

@@ -4,6 +4,12 @@
 
 The notable changes of each version. Before 1.0, a minor version may change the API; the release notes say so.
 
+## 0.3.1: npm publication through trusted publishing only
+
+- The release chain no longer passes any npm token: it publishes through trusted publishing (OIDC) alone. 0.3.0 was
+  built, tagged and its image pushed, but its npm publication failed (a leftover token made npm answer 404); 0.3.1
+  carries the same code.
+
 ## 0.3.0: the hosted service, built
 
 Dated by the "published" entry of the public release journal (branch `release-journal`), written when the signed tag

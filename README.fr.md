@@ -6,7 +6,7 @@
 
 [Read in English](README.md)
 
-> **0.3.0** ([changements](CHANGELOG.fr.md)), sur npm (`@filarr/gate`, `filarr-gate`) et sur GHCR
+> **0.3.1** ([changements](CHANGELOG.fr.md)), sur npm (`@filarr/gate`, `filarr-gate`) et sur GHCR
 > (`ghcr.io/filarr-work/gate`). La boîte noire suit les contrats gelés `api-base-1` (révisions 2 et 3), `db-store-1`
 > (3.9), `gate-fichiers-1`, `source-externe-1` et le paquet de réglages de `gate-heberge-1`, et elle est éprouvée de bout
 > en bout face à un serveur Filarr local (lecture, changements en direct, écriture, révocation, une synchro PostgreSQL

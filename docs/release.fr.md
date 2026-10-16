@@ -24,7 +24,7 @@ en service que par la chaîne de publication.
 
 Une seule version pour tout le dépôt, fixée par le mainteneur seulement, dans `packages/gate/package.json`,
 `packages/cli/package.json` (et les paquets privés, pour les garder alignés). La bibliothèque la déclare à Filarr sous
-la forme `lib-<version>`, le serveur sous la forme `<version>`. Cette publication : **0.3.0**.
+la forme `lib-<version>`, le serveur sous la forme `<version>`. Cette publication : **0.3.1**.
 
 ## Avant d'étiqueter
 
@@ -78,7 +78,7 @@ Tout cela est `.github/workflows/release.yml` ; la marche à suivre du mainteneu
 
 ## Les noms
 
-- **Image.** `ghcr.io/filarr-work/gate` : `:0.3.0`, `:0.3` (suit les correctifs 0.3.x) et `latest` ; `:<majeure>` à
+- **Image.** `ghcr.io/filarr-work/gate` : `:0.3.1`, `:0.3` (suit les correctifs 0.3.x) et `latest` ; `:<majeure>` à
   partir de la 1.0.
 - **Volume.** `/data`, comme dans l'appli Filarr.
 - **npm.** `@filarr/gate` (la bibliothèque) et `filarr-gate` (la commande). Si la portée change un jour, ce qu'il faut

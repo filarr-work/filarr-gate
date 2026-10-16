@@ -5,6 +5,12 @@
 Les changements notables de chaque version. Avant la 1.0, une version mineure peut changer l'API ; les notes de version
 le disent.
 
+## 0.3.1 : publication npm par la seule publication de confiance
+
+- La chaîne de publication ne passe plus aucun jeton npm : elle publie par la seule publication de confiance (OIDC).
+  La 0.3.0 a été construite, étiquetée et son image poussée, mais sa publication npm a échoué (un jeton resté en
+  place faisait répondre npm 404) ; la 0.3.1 porte le même code.
+
 ## 0.3.0 : le service hébergé, construit
 
 Datée par l'entrée « published » du journal public des mises en service (branche `release-journal`), écrite à la
