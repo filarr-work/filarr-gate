@@ -31,7 +31,7 @@ jamais limitées par Filarr.**
 | écritures | compte, jour (UTC) | chaque validation acceptée, quel que soit le nombre de lignes qu'elle porte |
 | débit des requêtes | accès, minute | |
 | fichiers déposés, leur volume | compte, mois (UTC) | Pro et plus |
-| appels hébergés | boîte hébergée, mois | la boîte hébergée seulement (bientôt) |
+| appels hébergés | boîte hébergée, mois | la boîte hébergée seulement |
 
 Le palier fixe aussi : combien d'accès, combien de bases par accès, l'écriture ou non, les changements en direct ou la
 relève, la conservation du journal de l'accès chez Filarr, les adresses autorisées, les fichiers, les synchros

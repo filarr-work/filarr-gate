@@ -24,7 +24,7 @@ affiche un jeton : de quoi suivre chaque tutoriel.
 | Utiliser | [appeler l'API : curl, JavaScript, Python](tutorials/first-calls.fr.md) · [la bibliothèque dans votre programme Node](tutorials/library.fr.md) · [recevoir les changements par webhook](tutorials/webhooks.fr.md) | |
 | Synchroniser | [une base Cloudflare D1, dans un sens, dans l'autre ou dans les deux](tutorials/sync-d1.fr.md) · [un PostgreSQL de votre réseau](tutorials/sync-postgres.fr.md) | côté Filarr bientôt |
 | Fichiers | [recevoir des fichiers dans un dossier Filarr](tutorials/receive-files.fr.md) | côté Filarr bientôt |
-| Hébergée | [passer à la boîte hébergée, puis revenir chez vous](tutorials/hosted-and-back.fr.md) | bientôt |
+| Hébergée | [passer à la boîte hébergée, puis revenir chez vous](tutorials/hosted-and-back.fr.md) | ouverte depuis le 27 octobre 2026 |
 | Sécurité | [révoquer un accès, réagir à une fuite](tutorials/revoke.fr.md) · [sécurité et confiance : qui voit quoi](security-and-trust.fr.md) | |
 | Aide | [dépannage](troubleshooting.fr.md) | |
 

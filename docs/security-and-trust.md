@@ -13,7 +13,7 @@ written here.
 |---|---|---|---|
 | **In your code, on your machine** (library, Node, Docker) | your computer, your server | you | **no** |
 | **On your Cloudflare account** | a Worker and a Durable Object of YOUR account | you (a Worker secret) | **no** (Cloudflare, as your host, is in the same position as for any Worker you run) |
-| **Hosted by Filarr** (coming soon, paid option) | a service of Filarr | that service, sealed | **yes**, for the databases you entrust to it and while they stay entrusted |
+| **Hosted by Filarr** (paid option, open since October 27, 2026) | a service of Filarr | that service, sealed | **yes**, for the databases you entrust to it and while they stay entrusted |
 
 ## Who sees what, at home (the first two modes)
 
@@ -85,8 +85,12 @@ endpoint returns. To share less, open a database that holds less.
 
 ## Hosted by Filarr
 
-> Coming soon. This section describes the hosted box as the frozen contract `gate-heberge-1` defines it, so that you
-> can judge it before it opens.
+> Open since October 27, 2026, on the Pro, Teams and Enterprise plans: 4 € a month or 48 € a year per box, one box
+> included per Teams or Enterprise organization. This section describes it as the frozen contract `gate-heberge-1`
+> fixes it. An internal security review is done; the external review is planned. The
+> [trust page](https://filarr.com/en/trust#trust-hosted) and the [hosted box DPA
+> annex](https://filarr.com/en/legal/dpa/hosted) are on Filarr's website. Managing the app keys and webhooks of a hosted
+> box is coming in a future version of Filarr's apps.
 
 For the databases you **entrust** to it, and while they stay entrusted, a service of Filarr manages their key and runs
 the same Filarr Gate: those databases are no longer end-to-end encrypted. Filarr will use one expression only: a
@@ -119,10 +123,10 @@ to the service, and those databases are end-to-end encrypted again); the folder 
 | encryption | taking the key back cuts the future | what the service processed BEFORE is covered by commitments only |
 | encryption | the token is never in clear in the API's database or its backups | it does not cover the traffic in transit, nor the service itself, which holds its private key |
 | none | the traffic of a hosted box, in transit | not end-to-end encrypted: the account that manages filarr.com terminates TLS and decrypts it; said in the consent |
-| verifiable | the code fingerprint the service announces equals the published version's | this checks what the service announces; Workers offer no remote attestation, so it does not prove that the running code is that code. Hence the external review, the public log of releases, and the commitment |
+| verifiable | the code fingerprint the service announces equals the published version's | this checks what the service announces; Workers offer no remote attestation, so it does not prove that the running code is that code. Hence the security reviews (internal done, external planned), the public log of releases, and the commitment |
 | verifiable | everything is traced | consent, service versions, sleep, take-back, erasure receipt, in the access's log |
 | verifiable | it shows | everyone who sees an entrusted database sees the mark, on every device |
-| commitment | isolation, no logging of content, copies in the EU, no other use | these are commitments, not protection by encryption: Cloudflare, as host, runs the machines where the service decrypts the data; a request crosses the point of presence nearest to the caller, which may be outside the EU (only the COPIES stay in the EU); the code and the configuration are deployed from Filarr's Cloudflare account: the commitment, the release chain and the external review frame that, not a technical barrier |
+| commitment | isolation, no logging of content, copies in the EU, no other use | these are commitments, not protection by encryption: Cloudflare, as host, runs the machines where the service decrypts the data; a request crosses the point of presence nearest to the caller, which may be outside the EU (only the COPIES stay in the EU); the code and the configuration are deployed from Filarr's Cloudflare account: the commitment, the release chain and the security reviews (internal done, external planned) frame that, not a technical barrier |
 | commitment | erasure | a signed receipt proves the service executed the order, not that no copy exists elsewhere |
 
 ### Isolation by script, in the same account
@@ -150,12 +154,16 @@ own Durable Objects; the API's script has no binding to them.
   the `security` role and naming the advisory. The log then says "security fix, seven-day delay lifted", with the
   advisory and its severity; each hosted access receives the event; the details of the flaw are published within 30
   days. Anything else waits seven days.
+- **As of October 27, 2026**, the version in service is 0.3.1; 0.3.2 is published, and its deployment is planned from
+  November 3, once its seven days have passed.
 
 ### Law
 
 The copies stay in the European Union (Durable Objects in the EU jurisdiction); requests and answers cross, in
-transit, the point of presence nearest to the caller. Filarr becomes your processor for the entrusted databases: a data
-processing agreement comes with the option, Cloudflare listed as sub-processor.
+transit, the point of presence nearest to the caller. Filarr becomes your processor for the entrusted databases: the [hosted box
+DPA annex](https://filarr.com/en/legal/dpa/hosted) comes with the option, Cloudflare listed as sub-processor; the
+offer's terms are in § 3a of the [Terms](https://filarr.com/en/legal/terms#section-3-bis), and the
+[trust page](https://filarr.com/en/trust#trust-hosted) sums them up.
 
 ### Compared with a box at home
 
@@ -172,8 +180,8 @@ processing agreement comes with the option, Cloudflare listed as sub-processor.
 What you accept when you entrust databases, word for word (version `hebergement-v1`). `{{box}}` becomes the box's
 name. The layout (title, bullets, checkbox) may differ from one app to another; the words may not: each Filarr app is
 tested against the SHA-256 fingerprint of this text that the contract fixes, and so is this page (`npm test`). If the
-text changes, Filarr asks you to accept it again; without a new consent after 30 days, the database is removed from the
-box.
+text changes, it takes a new version; without a consent on the current text after 30 days, the database is removed
+from the box.
 
 <!-- consent: hebergement-v1 en -->
 ```text

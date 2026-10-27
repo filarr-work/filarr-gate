@@ -2,10 +2,12 @@
 
 [Lire en français](hosted.fr.md)
 
-> Coming soon: the box hosted by Filarr is not open. Its code is in this repository (`packages/host`); it goes into
-> service only through the release chain, and the offer opens after an external security review. What is no longer
-> end-to-end encrypted in that mode, and what protects it: [security and trust](../security-and-trust.md#hosted-by-filarr).
-> The move there and back: [tutorial](../tutorials/hosted-and-back.md).
+> The box hosted by Filarr is open since October 27, 2026, on the Pro, Teams and Enterprise plans. Its code is in this
+> repository (`packages/host`); it goes into service only through the release chain. An internal security review is
+> done; the external review is planned. What is no longer end-to-end encrypted in that mode, and what protects it:
+> [security and trust](../security-and-trust.md#hosted-by-filarr), the [trust page](https://filarr.com/en/trust#trust-hosted)
+> and the [hosted box DPA annex](https://filarr.com/en/legal/dpa/hosted) on Filarr's website. The move there and back:
+> [tutorial](../tutorials/hosted-and-back.md).
 
 ## How it is mounted
 
@@ -25,7 +27,8 @@ sealed to the service's key.
 
 **What it does not guarantee, said as it is.** It does not protect from an administrator of the Cloudflare account,
 who can deploy code that reads the service's secrets or its objects: what frames that is deployment by the release
-chain only, the public log, the external review and Filarr's commitment, not a technical barrier. The requests and
+chain only, the public log, the security reviews (internal done, external planned) and Filarr's commitment, not a
+technical barrier. The requests and
 answers of a hosted box are not end-to-end encrypted in transit: the account that manages `filarr.com` terminates TLS
 for these names. Nothing protects from Cloudflare, the host.
 
@@ -37,7 +40,7 @@ for these names. Nothing protects from Cloudflare, the host.
 | opening | the box reads its sealed token, opens it with `HOST_ENC` in memory, derives its keys, and starts the same Filarr Gate core as at home, through the Cloudflare adapter (`packages/cloudflare`). The first app key arrives inside the sealed token, as a fingerprint only |
 | at rest | everything the box stores is encrypted with a key derived from the token (`K_box`, AES-256-GCM, each entry bound to the access and to its place). `K_box` exists in memory only: once the API erases the sealed token, what is stored can no longer be decrypted. Kept in clear: the access identifier, the box's name, its state, the reason and end of a sleep, the databases held and their generation, the month's call count, a receipt to hand over. Nothing from a database, a program or a setting |
 | requests to the API | every one carries, besides the access's proof, the service's signature (`Filarr-Gate-Host`); without it, Filarr's API refuses a hosted token |
-| management | no web interface. Filarr's apps manage the box through `/_admin/…`, each request signed by the creator's identity key (the key that the access's creator tag authenticates, pinned in the box's encrypted state) over the method, the path **with its query**, the time (300 s of clock skew at most) and the body's hash; each signed request is accepted once (a replay gets `401 admin_replay`). Changing the token, a password, forgetting the box or importing a file are closed on the service; the web app and the desktop app are the only origins admitted |
+| management | no web interface. The management channel is `/_admin/…`, each request signed by the creator's identity key (the key that the access's creator tag authenticates, pinned in the box's encrypted state) over the method, the path **with its query**, the time (300 s of clock skew at most) and the body's hash; each signed request is accepted once (a replay gets `401 admin_replay`). Changing the token, a password, forgetting the box or importing a file are closed on the service; the web app and the desktop app are the only origins admitted. Filarr's apps do not use it yet: managing the app keys and webhooks of a hosted box is coming in a future version |
 | calls | the month's calls are counted per box (only a call whose application key is authenticated counts; a request without a key, or with a refused key, does not), up to the plan's ceiling (`hostedCallsPerMonth` of `GET /public/api-limits`); beyond, `429 hosted_quota_calls` until the 1st of the next month (UTC). The total is handed to Filarr's API every hour |
 | sleep | unpaid, lower plan, organisation policy, emergency stop: the box serves nothing (`503 gate_asleep`, with the reason), empties its memory, and keeps its encrypted state and its sealed token. It wakes up on its own when the API says so. Taking it back home stays possible while it sleeps |
 | taking back home | the box seals its settings package (app key fingerprints, webhooks, saved queries, never a password nor an external database key) to the new identity, after checking that the creator signed it with the pinned key |
@@ -59,14 +62,14 @@ signed management channel.
 
 signed by `HOST_SIG` over `filarr/gate-host/v1|version|` followed by the canonical JSON without `sig`. A security fix
 adds `"security": true` and `"advisory": "GHSA-…"`. At each deployment, the service hands it to Filarr's API, which
-writes it in the log of every hosted access; Filarr's apps compare `codeHash` with the published release and say "the
-same as the published version" or, in red, "different from the published version".
+writes it in the log of every hosted access; Filarr's apps show the version and the code fingerprint in **Settings ›
+API access**: compare them with that version's line in the public deployment log.
 
 **What that proves, and what it does not.** It proves the service **announces** the code of a published release. No
 remote attestation exists on Cloudflare Workers: nobody, Filarr included, can prove to you that the code running is the
 code announced. That is why releases go into service only from a signed tag, seven days after publication (except a
-security fix, logged as such), why a public log lists them, and why an external security review comes before the
-service opens.
+security fix, logged as such), why a public log lists them, and why the service had an internal security review,
+with the external review planned.
 
 ## Checking a release yourself
 

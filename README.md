@@ -11,8 +11,8 @@
 > (3.9), `gate-fichiers-1`, `source-externe-1` and the settings package of `gate-heberge-1`, and is tested end to end
 > against a local Filarr server (reads, live changes, writes, revocation, an external PostgreSQL sync, a file deposit,
 > the Cloudflare variant). In Filarr, API access opens account by account. This version also contains the service that
-> will run the box hosted by Filarr ([the hosted service](docs/explain/hosted.md)); it is built but not open yet: the
-> hosted offer opens later, after an external security review.
+> runs the box hosted by Filarr ([the hosted service](docs/explain/hosted.md)); the hosted offer is open since October
+> 27, 2026, on the Pro, Teams and Enterprise plans. An internal security review is done; the external review is planned.
 
 Filarr encrypts your notes and databases end to end: its servers store blocks they cannot read. Filarr Gate is a small
 **gate you run yourself** (in your code, on a PC, in Docker, on your own Cloudflare account) that holds the key to the
@@ -100,7 +100,7 @@ Every page also exists in French, linked at the top of the page.
   [call the API in curl, JavaScript, Python](docs/tutorials/first-calls.md) · [webhooks](docs/tutorials/webhooks.md) ·
   [sync D1](docs/tutorials/sync-d1.md) and [PostgreSQL](docs/tutorials/sync-postgres.md) ·
   [receive files](docs/tutorials/receive-files.md) · [revoke](docs/tutorials/revoke.md) ·
-  [hosted box and back](docs/tutorials/hosted-and-back.md) (coming soon) · [troubleshooting](docs/troubleshooting.md)
+  [hosted box and back](docs/tutorials/hosted-and-back.md) · [troubleshooting](docs/troubleshooting.md)
 - **Use cases**, complete and tested: [examples/](examples)
 - **Reference**: [API](docs/reference/api.md) · [OpenAPI](docs/openapi/filarr-gate.v1.json) ·
   [configuration](docs/reference/configuration.md) · [command line](docs/reference/cli.md) ·

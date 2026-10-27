@@ -13,7 +13,7 @@ que sur des engagements. Là où une limite existe, elle est écrite ici.
 |---|---|---|---|
 | **Dans votre code, sur votre machine** (bibliothèque, Node, Docker) | votre ordinateur, votre serveur | vous | **non** |
 | **Sur votre compte Cloudflare** | un Worker et un Durable Object de VOTRE compte | vous (un secret du Worker) | **non** (Cloudflare, votre hébergeur, est dans la même position que pour n'importe quel Worker que vous faites tourner) |
-| **Hébergée par Filarr** (bientôt, option payante) | un service de Filarr | ce service, scellé | **oui**, pour les bases que vous lui confiez et tant qu'elles restent confiées |
+| **Hébergée par Filarr** (option payante, ouverte depuis le 27 octobre 2026) | un service de Filarr | ce service, scellé | **oui**, pour les bases que vous lui confiez et tant qu'elles restent confiées |
 
 ## Qui voit quoi, chez vous (les deux premiers modes)
 
@@ -88,8 +88,12 @@ façonner ce que rend un point d'accès. Pour partager moins, ouvrez une base qu
 
 ## Hébergée par Filarr
 
-> Bientôt. Cette section décrit la boîte hébergée telle que la définit le contrat gelé `gate-heberge-1`, pour que vous
-> puissiez la juger avant qu'elle ouvre.
+> Ouverte depuis le 27 octobre 2026, aux paliers Pro, Teams et Enterprise : 4 € par mois ou 48 € par an et par boîte,
+> une boîte incluse par organisation Teams ou Enterprise. Cette section la décrit telle que la fixe le contrat gelé
+> `gate-heberge-1`. Une revue de sécurité interne est faite ; la revue externe est planifiée. La
+> [page de confiance](https://filarr.com/fr/trust#trust-hosted) et l'[annexe au DPA de la boîte
+> hébergée](https://filarr.com/fr/legal/dpa/hosted) sont sur le site de Filarr. La gestion des clés d'application et des
+> webhooks d'une boîte hébergée arrive dans une prochaine version des applis de Filarr.
 
 Pour les bases que vous lui **confiez**, et tant qu'elles restent confiées, un service de Filarr gère leur clé et fait
 tourner la même Filarr Gate : ces bases ne sont plus chiffrées de bout en bout. Filarr n'emploiera qu'une expression :
@@ -123,10 +127,10 @@ où sont rangés vos fichiers reçus (seuls vos appareils les rangent).
 | chiffrement | reprendre la clé coupe l'avenir | ce que le service a traité AVANT n'est couvert que par les engagements |
 | chiffrement | le jeton n'est jamais en clair dans la base de données de l'API ni dans ses sauvegardes | cela ne couvre pas le trafic en transit, ni le service lui-même, qui détient sa clé privée |
 | aucune | le trafic d'une boîte hébergée, en transit | il n'est pas chiffré de bout en bout : le compte qui gère filarr.com termine le TLS et le déchiffre ; l'accord le dit |
-| vérifiable | l'empreinte de code que le service annonce égale celle de la version publiée | cela vérifie ce que le service annonce ; les Workers n'offrent pas d'attestation à distance, cela ne prouve donc pas que le code qui tourne est celui-là. D'où la revue externe, le journal public des mises en service, et l'engagement |
+| vérifiable | l'empreinte de code que le service annonce égale celle de la version publiée | cela vérifie ce que le service annonce ; les Workers n'offrent pas d'attestation à distance, cela ne prouve donc pas que le code qui tourne est celui-là. D'où les revues de sécurité (interne faite, externe planifiée), le journal public des mises en service, et l'engagement |
 | vérifiable | tout se trace | accord, versions du service, sommeil, reprise, reçu d'effacement, au journal de l'accès |
 | vérifiable | cela se voit | quiconque voit une base confiée voit la marque, sur tous les appareils |
-| engagement | isolement, aucune journalisation du contenu, copies dans l'UE, aucun autre usage | ce sont des engagements, pas une protection par le chiffrement : Cloudflare, l'hébergeur, fait tourner les machines où le service déchiffre les données ; une requête traverse le point de présence le plus proche de l'appelant, qui peut être hors de l'UE (seules les COPIES restent dans l'UE) ; le code et la configuration sont mis en service depuis le compte Cloudflare de Filarr : l'engagement, la chaîne de mise en service et la revue externe encadrent cela, pas une barrière technique |
+| engagement | isolement, aucune journalisation du contenu, copies dans l'UE, aucun autre usage | ce sont des engagements, pas une protection par le chiffrement : Cloudflare, l'hébergeur, fait tourner les machines où le service déchiffre les données ; une requête traverse le point de présence le plus proche de l'appelant, qui peut être hors de l'UE (seules les COPIES restent dans l'UE) ; le code et la configuration sont mis en service depuis le compte Cloudflare de Filarr : l'engagement, la chaîne de mise en service et les revues de sécurité (interne faite, externe planifiée) encadrent cela, pas une barrière technique |
 | engagement | effacement | un reçu signé prouve que le service a exécuté l'ordre, pas qu'aucune copie n'existe ailleurs |
 
 ### L'isolement par script, dans le même compte
@@ -155,13 +159,17 @@ ses propres Durable Objects ; le script de l'API n'a aucune liaison vers eux.
   `vX.Y.Z-security` signée par une clé du rôle `security` et qui nomme l'avis. Le journal dit alors « correctif de
   sécurité, délai de sept jours levé », avec l'avis et sa gravité ; chaque accès hébergé reçoit l'événement ; le détail
   de la faille est publié dans les 30 jours. Tout le reste attend sept jours.
+- **Au 27 octobre 2026**, la version en service est la 0.3.1 ; la 0.3.2 est publiée, et sa mise en service est prévue
+  à partir du 3 novembre, ses sept jours passés.
 
 ### Le droit
 
 Les copies restent dans l'Union européenne (Durable Objects dans la juridiction UE) ; les requêtes et les réponses
 traversent, en transit, le point de présence le plus proche de l'appelant. Filarr devient votre sous-traitant pour les
-bases confiées : un accord de traitement des données accompagne l'option, avec Cloudflare comme sous-traitant
-ultérieur.
+bases confiées : l'[annexe au DPA de la boîte hébergée](https://filarr.com/fr/legal/dpa/hosted) accompagne l'option,
+avec Cloudflare comme sous-traitant ultérieur ; les conditions de l'offre sont au § 3 bis des
+[CGU](https://filarr.com/fr/legal/terms#section-3-bis), et la [page de confiance](https://filarr.com/fr/trust#trust-hosted)
+les résume.
 
 ### Comparée à une boîte noire chez vous
 
@@ -178,8 +186,8 @@ ultérieur.
 Voici, mot pour mot, ce que vous acceptez en confiant des bases (version `hebergement-v1`). `{{box}}` y devient le nom
 de la boîte. La mise en forme (titre, puces, case à cocher) peut varier d'une appli à l'autre ; les mots, non : chaque
 appli Filarr est vérifiée au regard de l'empreinte SHA-256 de ce texte, fixée par le contrat, et cette page aussi (`npm
-test`). Si le texte change, Filarr vous redemande votre accord ; sans nouvel accord au bout de 30 jours, la base est
-retirée de la boîte.
+test`). Si le texte change, il prend une nouvelle version ; sans accord sur le texte en vigueur au bout de 30 jours, la
+base est retirée de la boîte.
 
 <!-- consent: hebergement-v1 fr -->
 ```text

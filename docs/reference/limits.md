@@ -30,7 +30,7 @@ Only what goes through Filarr. **Reads served by the gate from its copy are neve
 | writes | account, day (UTC) | each accepted commit, whatever the number of rows in it |
 | request rate | access, minute | |
 | files deposited, their volume | account, month (UTC) | Pro and above |
-| hosted calls | hosted box, month | the hosted box only (coming soon) |
+| hosted calls | hosted box, month | the hosted box only |
 
 The plan also sets: how many accesses, how many databases per access, writes or not, live changes or polling, the
 retention of the access's log at Filarr, allowed addresses, files, scheduled external syncs, the hosted option.

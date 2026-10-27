@@ -372,7 +372,7 @@ export const FILARR_REV3_FR: Record<string, CodeText & { gate?: string }> = {
   reauth_failed: { what: "La preuve d'identité est fausse.", fix: 'Recommencez ; après 10 essais en une heure, patientez.' },
   api_tier_hosted: { what: 'La boîte hébergée demande le palier Pro ou plus.', fix: 'Un palier supérieur, ou une boîte noire chez vous.' },
   hosting_forbidden: { what: "L'organisation interdit les boîtes hébergées.", fix: "Voyez avec un administrateur de l'organisation, ou installez la boîte noire chez vous." },
-  hosting_not_switched: { what: "La boîte hébergée n'est pas encore ouverte pour ce compte.", fix: "Rien à faire : elle s'ouvre compte par compte." },
+  hosting_not_switched: { what: "La boîte hébergée n'est pas encore ouverte pour ce compte.", fix: "L'offre est ouverte depuis le 27 octobre 2026 : réessayez plus tard, puis écrivez au support de Filarr si le refus reste." },
   consent_outdated: { what: "Le texte de l'accord a changé depuis que vous l'avez accepté.", fix: 'Filarr réaffiche le nouveau texte ; acceptez-le pour garder la base confiée.' },
   host_key_unknown: { what: 'Votre appli Filarr ne connaît pas la clé actuelle du service hébergé.', fix: "Mettez l'appli Filarr à jour." },
   hosting_billing_unavailable: { what: "Aucun abonnement Stripe ne peut porter l'option pour ce payeur.", fix: "Gérez la facturation dans Filarr, ou facturez l'organisation." },

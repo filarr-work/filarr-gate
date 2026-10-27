@@ -21,7 +21,7 @@ enough to follow every tutorial.
 | Use | [call the API: curl, JavaScript, Python](tutorials/first-calls.md) · [the library in your Node program](tutorials/library.md) · [receive changes by webhook](tutorials/webhooks.md) | |
 | Sync | [a Cloudflare D1 database, in every direction](tutorials/sync-d1.md) · [a PostgreSQL of your network](tutorials/sync-postgres.md) | Filarr side coming soon |
 | Files | [receive files into a Filarr folder](tutorials/receive-files.md) | Filarr side coming soon |
-| Hosted | [move to the hosted box, then come back home](tutorials/hosted-and-back.md) | coming soon |
+| Hosted | [move to the hosted box, then come back home](tutorials/hosted-and-back.md) | open since October 27, 2026 |
 | Safety | [revoke an access, react to a leak](tutorials/revoke.md) · [security and trust: who sees what](security-and-trust.md) | |
 | Help | [troubleshooting](troubleshooting.md) | |
 

@@ -185,7 +185,7 @@ Revision 3 (hosted box, files, external syncs), read from the vectors:
 | `reauth_failed` | 401 |  |  | The proof of identity was wrong. | Try again; after 10 tries in an hour, wait. |
 | `api_tier_hosted` | 403 | `upgrade` |  | The hosted box needs the Pro plan or above. | A higher plan, or run the gate yourself. |
 | `hosting_forbidden` | 403 |  |  | The organization forbids hosted boxes. | Ask an organization admin, or run the gate yourself. |
-| `hosting_not_switched` | 409 |  |  | The hosted box is not open yet for this account. | Nothing to do; it opens account by account. |
+| `hosting_not_switched` | 409 |  |  | The hosted box is not open yet for this account. | The offer is open since October 27, 2026: try again later, then write to Filarr support if the refusal stays. |
 | `consent_outdated` | 409 |  |  | The consent text changed since you accepted it. | Filarr shows the new text again; accept it to keep the database entrusted. |
 | `host_key_unknown` | 409 |  |  | Your Filarr app does not know the hosted service's current key. | Update the Filarr app. |
 | `hosting_billing_unavailable` | 409 | `manageBilling` |  | No Stripe subscription can carry the option for this payer. | Manage billing in Filarr, or bill the organization. |

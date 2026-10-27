@@ -2,16 +2,17 @@
 
 [Lire en français](hosted-and-back.fr.md)
 
-> **Coming soon.** The box hosted by Filarr is not open yet: it opens after an external security review, account by
-> account, and this page describes it as the frozen contract `gate-heberge-1` fixes it. What already works today is the
-> gate's half of the move: the settings package (`gate-settings-1`) that carries your app keys, webhooks and saved
-> queries from one gate to the next, online or as a file, run by the test suite.
+> The box hosted by Filarr is open since October 27, 2026, on the Pro, Teams and Enterprise plans. An internal security
+> review is done; the external review is planned. Managing the app keys and webhooks of a hosted box is coming in a
+> future version of Filarr's apps.
 
 **At the end** you will know what "hosted by Filarr" changes, how to entrust databases to it, how to take the key
 back to a gate of your own with the same app keys and webhooks, and what the erasure receipt proves and does not prove.
 
-**Plan:** a paid option from Pro (one box included per Teams or Enterprise organization). The price is on Filarr's
-pricing page and in **Settings › API access**.
+**Plan:** a paid option from Pro, 4 € a month or 48 € a year per box (one box included per Teams or Enterprise
+organization). In the apps, the box is billed today on the personal Pro subscription of the person who creates it. The
+terms: the [hosted box DPA annex](https://filarr.com/en/legal/dpa/hosted) and § 3a of the
+[Terms](https://filarr.com/en/legal/terms#section-3-bis).
 
 ## What changes, said plainly
 
@@ -40,14 +41,14 @@ Filarr**. At Filarr:
 
 1. tick each database to entrust (none is ticked for you);
 2. read the consent and tick "I understand that the checked databases will no longer be end-to-end encrypted while
-   they are entrusted to Filarr" (the text is versioned: a change of text asks you again);
-3. prove it is you again (password and two-factor code, or a passkey);
+   they are entrusted to Filarr" (the text is versioned: its version and fingerprint show under the consent);
+3. prove it is you again, under **Confirm my identity**: your password and, if it is on, the two-factor code;
 4. **Entrust 1 database to Filarr**.
 
 Your device draws the token and seals it to the hosted service's key, which the apps carry built in: nobody sees the
-token, not even you. It shows you the box's address (`https://site-vitrine-7qm2.gate.filarr.com`) and a first app key
-(`gk_…`), once. There is no management UI on the hosted box: its app keys, webhooks, saved queries and file filter are
-set in **Settings › API access**.
+token, not even you. It shows you a first app key (`gk_…`), once; **Settings › API access** then gives the box's
+address (`https://site-vitrine-7qm2.gate.filarr.com`). There is no management UI on the hosted box; managing its app
+keys and webhooks from Filarr's apps is coming in a future version.
 
 Everyone who can see an entrusted database sees it marked "API hosted by Filarr · not end-to-end encrypted", on
 every device; the members of a vault are told who entrusted it. Only the vault's owner or admins can entrust or take
@@ -62,7 +63,7 @@ Five steps, without stopping your software:
 
 1. **Install a gate** where you want it ([computer](install-local.md), [Docker](install-docker.md),
    [Cloudflare](install-cloudflare.md)). Do not give it a token yet.
-2. **Prepare**, in Filarr (**Settings › API access**, the hosted access, **Bring it back home**): your device draws a
+2. **Prepare**, in Filarr (**Settings › API access**, the hosted access, **Take back the key…**, then **Move to my own gate**): your device draws a
    new identity for the access and shows its token once. It waits as a "pending identity" for 7 days; the hosted box
    keeps serving meanwhile. The hosted box checks that the new identity is signed by you, seals its settings for it,
    and drops them at Filarr.

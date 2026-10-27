@@ -175,7 +175,7 @@ dans les vecteurs `boite-noire-v2-serveur` sur lesquels le serveur de Filarr est
 | `reauth_failed` | 401 |  | La preuve d'identité est fausse. | Recommencez ; après 10 essais en une heure, patientez. |
 | `api_tier_hosted` | 403 | `upgrade` | La boîte hébergée demande le palier Pro ou plus. | Un palier supérieur, ou une boîte noire chez vous. |
 | `hosting_forbidden` | 403 |  | L'organisation interdit les boîtes hébergées. | Voyez avec un administrateur de l'organisation, ou installez la boîte noire chez vous. |
-| `hosting_not_switched` | 409 |  | La boîte hébergée n'est pas encore ouverte pour ce compte. | Rien à faire : elle s'ouvre compte par compte. |
+| `hosting_not_switched` | 409 |  | La boîte hébergée n'est pas encore ouverte pour ce compte. | L'offre est ouverte depuis le 27 octobre 2026 : réessayez plus tard, puis écrivez au support de Filarr si le refus reste. |
 | `consent_outdated` | 409 |  | Le texte de l'accord a changé depuis que vous l'avez accepté. | Filarr réaffiche le nouveau texte ; acceptez-le pour garder la base confiée. |
 | `host_key_unknown` | 409 |  | Votre appli Filarr ne connaît pas la clé actuelle du service hébergé. | Mettez l'appli Filarr à jour. |
 | `hosting_billing_unavailable` | 409 | `manageBilling` | Aucun abonnement Stripe ne peut porter l'option pour ce payeur. | Gérez la facturation dans Filarr, ou facturez l'organisation. |

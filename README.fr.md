@@ -11,9 +11,9 @@
 > (3.9), `gate-fichiers-1`, `source-externe-1` et le paquet de réglages de `gate-heberge-1`, et elle est éprouvée de bout
 > en bout face à un serveur Filarr local (lecture, changements en direct, écriture, révocation, une synchro PostgreSQL
 > externe, un dépôt de fichier, la variante Cloudflare). Dans Filarr, les accès API s'ouvrent compte par compte. Cette
-> version contient aussi le service qui fera tourner la boîte hébergée par Filarr ([le service
-> hébergé](docs/explain/hosted.fr.md)) ; il est construit mais pas encore ouvert : l'offre hébergée ouvrira plus tard,
-> après une revue de sécurité externe.
+> version contient aussi le service qui fait tourner la boîte hébergée par Filarr ([le service
+> hébergé](docs/explain/hosted.fr.md)) ; l'offre hébergée est ouverte depuis le 27 octobre 2026, aux paliers Pro,
+> Teams et Enterprise. Une revue de sécurité interne est faite ; la revue externe est planifiée.
 
 Filarr chiffre vos notes et vos bases de bout en bout : ses serveurs gardent des blocs qu'ils ne savent pas lire.
 Filarr Gate est une petite **boîte noire que vous faites tourner vous-même** (dans votre code, sur un PC, dans Docker,
@@ -107,7 +107,7 @@ Toute la documentation existe en français et en anglais : chaque page renvoie �
   [webhooks](docs/tutorials/webhooks.fr.md) · [synchroniser D1](docs/tutorials/sync-d1.fr.md) et
   [PostgreSQL](docs/tutorials/sync-postgres.fr.md) · [recevoir des fichiers](docs/tutorials/receive-files.fr.md) ·
   [révoquer](docs/tutorials/revoke.fr.md) · [passer à la boîte hébergée, puis
-  revenir](docs/tutorials/hosted-and-back.fr.md) (bientôt) · [dépannage](docs/troubleshooting.fr.md)
+  revenir](docs/tutorials/hosted-and-back.fr.md) · [dépannage](docs/troubleshooting.fr.md)
 - **Cas d'usage**, complets et éprouvés : [examples/](examples) (décrits en anglais)
 - **Référence** : [API](docs/reference/api.fr.md) · [OpenAPI](docs/openapi/filarr-gate.v1.json) ·
   [réglages](docs/reference/configuration.fr.md) · [ligne de commande](docs/reference/cli.fr.md) ·

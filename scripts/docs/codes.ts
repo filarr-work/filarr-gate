@@ -233,7 +233,7 @@ export const FILARR_REV3: Record<string, CodeText & { gate?: string }> = {
   reauth_failed: { what: 'The proof of identity was wrong.', fix: 'Try again; after 10 tries in an hour, wait.' },
   api_tier_hosted: { what: 'The hosted box needs the Pro plan or above.', fix: 'A higher plan, or run the gate yourself.' },
   hosting_forbidden: { what: 'The organization forbids hosted boxes.', fix: 'Ask an organization admin, or run the gate yourself.' },
-  hosting_not_switched: { what: 'The hosted box is not open yet for this account.', fix: 'Nothing to do; it opens account by account.' },
+  hosting_not_switched: { what: 'The hosted box is not open yet for this account.', fix: 'The offer is open since October 27, 2026: try again later, then write to Filarr support if the refusal stays.' },
   consent_outdated: { what: 'The consent text changed since you accepted it.', fix: 'Filarr shows the new text again; accept it to keep the database entrusted.' },
   host_key_unknown: { what: 'Your Filarr app does not know the hosted service\'s current key.', fix: 'Update the Filarr app.' },
   hosting_billing_unavailable: { what: 'No Stripe subscription can carry the option for this payer.', fix: 'Manage billing in Filarr, or bill the organization.' },

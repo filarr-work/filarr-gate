@@ -2,18 +2,18 @@
 
 [Read in English](hosted-and-back.md)
 
-> **Bientôt.** La boîte hébergée par Filarr n'est pas encore ouverte : elle ouvrira, compte par compte, après une revue
-> de sécurité externe, et cette page la décrit telle que la fixe le contrat gelé `gate-heberge-1`. Ce qui marche déjà
-> aujourd'hui, c'est la moitié du déménagement qui revient à la boîte noire : le paquet de réglages (`gate-settings-1`)
-> qui porte vos clés d'application, vos webhooks et vos requêtes enregistrées d'une boîte noire à la suivante, en ligne
-> ou par fichier, exécuté par la suite d'essais.
+> La boîte hébergée par Filarr est ouverte depuis le 27 octobre 2026, aux paliers Pro, Teams et Enterprise. Une revue de
+> sécurité interne est faite ; la revue externe est planifiée. La gestion des clés d'application et des webhooks d'une
+> boîte hébergée arrive dans une prochaine version des applis de Filarr.
 
 **À la fin**, vous saurez ce que change « hébergée par Filarr », comment lui confier des bases, comment reprendre la clé
 pour revenir à une boîte noire à vous avec les mêmes clés d'application et les mêmes webhooks, et ce que le reçu
 d'effacement prouve et ne prouve pas.
 
-**Palier :** une option payante à partir de Pro (une boîte incluse par organisation Teams ou Enterprise). Le prix est
-sur la page des offres de Filarr et dans **Paramètres › Accès API**.
+**Palier :** une option payante à partir de Pro, 4 € par mois ou 48 € par an et par boîte (une boîte incluse par
+organisation Teams ou Enterprise). Dans les applis, la boîte se facture aujourd'hui sur l'abonnement Pro personnel de la
+personne qui la crée. Les conditions : l'[annexe au DPA de la boîte hébergée](https://filarr.com/fr/legal/dpa/hosted)
+et le § 3 bis des [CGU](https://filarr.com/fr/legal/terms#section-3-bis).
 
 ## Ce qui change, dit simplement
 
@@ -42,15 +42,16 @@ Filarr**. Chez Filarr :
 
 1. cochez chaque base à confier (aucune n'est cochée pour vous) ;
 2. lisez l'accord et cochez « J'ai compris que les bases cochées ne seront plus chiffrées de bout en bout tant qu'elles
-   sont confiées à Filarr. » (le texte est versionné : s'il change, Filarr vous redemande votre accord) ;
-3. prouvez de nouveau que c'est vous (mot de passe et code de double authentification, ou une clé d'accès) ;
+   sont confiées à Filarr. » (le texte est versionné : sa version et son empreinte s'affichent sous l'accord) ;
+3. prouvez de nouveau que c'est vous, sous **Confirmer mon identité** : votre mot de passe et, s'il est activé, le code
+   de double authentification ;
 4. **Confier 1 base à Filarr**.
 
 Votre appareil tire le jeton et le scelle pour la clé du service hébergé, que les applis portent en elles : personne ne
-voit le jeton, pas même vous. Il vous montre, une seule fois, l'adresse de la boîte
-(`https://site-vitrine-7qm2.gate.filarr.com`) et une première clé d'application (`gk_…`). La boîte hébergée n'a pas
-d'interface de gestion : ses clés d'application, ses webhooks, ses requêtes enregistrées et son filtre de fichiers se
-règlent dans **Paramètres › Accès API**.
+voit le jeton, pas même vous. Il vous montre, une seule fois, une première clé d'application
+(`gk_…`) ; **Paramètres › Accès API** donne ensuite l'adresse de la boîte (`https://site-vitrine-7qm2.gate.filarr.com`).
+La boîte hébergée n'a pas d'interface de gestion ; la gestion de ses clés d'application et de ses webhooks depuis les
+applis de Filarr arrive dans une prochaine version.
 
 Toute personne qui peut voir une base confiée la voit marquée « API hébergée par Filarr · pas chiffrée de bout en
 bout », sur tous les appareils ; les membres d'un coffre apprennent qui l'a confiée. Seuls le propriétaire ou les
@@ -65,7 +66,7 @@ Cinq étapes, sans arrêter vos logiciels :
 
 1. **Installez une boîte noire** là où vous la voulez ([ordinateur](install-local.fr.md),
    [Docker](install-docker.fr.md), [Cloudflare](install-cloudflare.fr.md)). Ne lui donnez pas encore de jeton.
-2. **Préparez**, dans Filarr (**Paramètres › Accès API**, l'accès hébergé, **Reprendre chez moi**) : votre appareil tire
+2. **Préparez**, dans Filarr (**Paramètres › Accès API**, l'accès hébergé, **Reprendre la clé…**, puis **Passer à ma propre boîte noire**) : votre appareil tire
    une identité neuve pour l'accès et montre son jeton une fois. Elle reste sept jours en attente (« identité en attente
    ») ; la boîte hébergée continue de servir en attendant. La boîte hébergée vérifie que l'identité neuve est signée par
    vous, scelle ses réglages pour elle, et les dépose chez Filarr.
