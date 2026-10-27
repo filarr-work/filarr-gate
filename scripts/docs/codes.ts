@@ -245,6 +245,8 @@ export const FILARR_REV3: Record<string, CodeText & { gate?: string }> = {
   hosting_too_large: { what: 'The databases to entrust are too large for a hosted box.', fix: 'Entrust fewer databases, or run the gate yourself.' },
   hosting_asleep: { what: 'The hosted box is asleep (payment, plan or policy). `remedy` says what wakes it up.', gate: 'Link `asleep`.', fix: 'See **Settings › API access** in Filarr.' },
   hosted_origin_required: { what: 'A hosted box\'s token was presented outside the hosted service.', gate: 'Refused: a hosted token is useless elsewhere.', fix: 'Nothing; this protects the token.' },
+  receipt_stale: { what: 'The hosted service handed in an erasure receipt from another hosting of this access, or older than the request it answers.', gate: 'The hosted box drops it for good.', fix: 'Nothing.' },
+  receipt_unexpected: { what: 'The hosted service handed in an erasure receipt that the hosting does not wait for (no erasure, or no withdrawal of that database, in progress).', gate: 'The hosted box drops a full receipt, and retries a partial one later.', fix: 'Nothing.' },
   api_access_pending: { what: 'A new identity waiting for a migration called something other than `self` or its import.', gate: 'Link `pending`; reads its settings package and waits.', fix: 'Finish the migration in Filarr.' },
   api_tier_files: { what: 'Receiving files through the API needs the Pro plan or above.', gate: 'Passes the refusal on (`403`).', fix: 'A higher plan.' },
   files_not_switched: { what: 'Files through the API are not open yet for this account.', gate: 'Passes the refusal on.', fix: 'Nothing; it opens account by account.' },

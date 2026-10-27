@@ -395,6 +395,16 @@ export const FILARR_REV3_FR: Record<string, CodeText & { gate?: string }> = {
     gate: 'Refusé, car un jeton hébergé ne sert à rien ailleurs.',
     fix: "Rien : c'est ce qui protège ce jeton.",
   },
+  receipt_stale: {
+    what: "Le service hébergé a remis un reçu d'effacement d'un autre hébergement de cet accès, ou antérieur à la demande à laquelle il répond.",
+    gate: 'La boîte hébergée le jette, définitivement.',
+    fix: 'Rien.',
+  },
+  receipt_unexpected: {
+    what: "Le service hébergé a remis un reçu d'effacement que l'hébergement n'attend pas (aucun effacement, ou aucun retrait de cette base, en cours).",
+    gate: 'La boîte hébergée jette un reçu complet, et réessaie plus tard un reçu partiel.',
+    fix: 'Rien.',
+  },
   api_access_pending: {
     what: 'Une identité neuve, en attente de migration, a appelé autre chose que `self` ou son import.',
     gate: 'Liaison `pending` ; lit son paquet de réglages et attend.',

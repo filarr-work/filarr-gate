@@ -197,6 +197,8 @@ Revision 3 (hosted box, files, external syncs), read from the vectors:
 | `hosting_too_large` | 413 |  |  | The databases to entrust are too large for a hosted box. | Entrust fewer databases, or run the gate yourself. |
 | `hosting_asleep` | 403 | billing: `updatePayment`; tier: `upgrade`; policy: none; consent: none; service: none |  | The hosted box is asleep (payment, plan or policy). `remedy` says what wakes it up. Gate: Link `asleep`. | See **Settings › API access** in Filarr. |
 | `hosted_origin_required` | 401 |  |  | A hosted box's token was presented outside the hosted service. Gate: Refused: a hosted token is useless elsewhere. | Nothing; this protects the token. |
+| `receipt_stale` | 409 |  |  | The hosted service handed in an erasure receipt from another hosting of this access, or older than the request it answers. Gate: The hosted box drops it for good. | Nothing. |
+| `receipt_unexpected` | 409 |  |  | The hosted service handed in an erasure receipt that the hosting does not wait for (no erasure, or no withdrawal of that database, in progress). Gate: The hosted box drops a full receipt, and retries a partial one later. | Nothing. |
 | `api_access_pending` | 403 |  |  | A new identity waiting for a migration called something other than `self` or its import. Gate: Link `pending`; reads its settings package and waits. | Finish the migration in Filarr. |
 | `api_tier_files` | 403 | `upgrade` |  | Receiving files through the API needs the Pro plan or above. Gate: Passes the refusal on (`403`). | A higher plan. |
 | `files_not_switched` | 409 |  |  | Files through the API are not open yet for this account. Gate: Passes the refusal on. | Nothing; it opens account by account. |

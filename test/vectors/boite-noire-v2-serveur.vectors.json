@@ -106,6 +106,18 @@
         "retryAfter": false
       },
       {
+        "code": "receipt_stale",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "receipt_unexpected",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
         "code": "api_access_pending",
         "status": 403,
         "remedy": null,
