@@ -7,7 +7,7 @@
 
 import { toBase64Std } from '../../packages/core/src/engine/store/apiAccess';
 import { curves } from '../../packages/gate/src/crypto/providers';
-import { BoxRuntime, type RawStorage } from '../../packages/host/src/box';
+import { BoxRuntime, type BoxTiming, type RawStorage } from '../../packages/host/src/box';
 import { Directory } from '../../packages/host/src/directory';
 import type { HostEnv } from '../../packages/host/src/env';
 import { clearFrontCache, handleFront } from '../../packages/host/src/front';
@@ -21,6 +21,8 @@ const clone = (v: unknown): unknown => (v instanceof Uint8Array ? v.slice() : v 
 export class MemoryDoStorage implements RawStorage {
   readonly data = new Map<string, unknown>();
   alarm: number | null = null;
+  /** Les clés écrites, dans l'ordre (essais : ce qu'une requête coûte en écritures). */
+  readonly writes: string[] = [];
 
   get<T = unknown>(key: string): Promise<T | undefined>;
   get<T = unknown>(keys: string[]): Promise<Map<string, T>>;
@@ -36,8 +38,15 @@ export class MemoryDoStorage implements RawStorage {
   put<T>(key: string, value: T): Promise<void>;
   put<T>(entries: Record<string, T>): Promise<void>;
   async put<T>(k: string | Record<string, T>, v?: T): Promise<void> {
-    if (typeof k === 'string') this.data.set(k, clone(v));
-    else for (const [key, value] of Object.entries(k)) this.data.set(key, clone(value));
+    if (typeof k === 'string') {
+      this.writes.push(k);
+      this.data.set(k, clone(v));
+    } else {
+      for (const [key, value] of Object.entries(k)) {
+        this.writes.push(key);
+        this.data.set(key, clone(value));
+      }
+    }
   }
 
   delete(key: string): Promise<boolean>;
@@ -102,7 +111,7 @@ export class HostHarness {
   private pending: Array<Promise<unknown>> = [];
   readonly env: HostEnv;
   now: () => number = () => Date.now();
-  timing: { checkEveryMs?: number; usageEveryMs?: number } = {};
+  timing: BoxTiming = {};
 
   constructor(
     readonly apiUrl: string,

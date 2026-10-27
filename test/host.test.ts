@@ -20,10 +20,10 @@ import { HOST_VERSION } from '../packages/host/src/env';
 import { HostApi } from '../packages/host/src/hostApi';
 import { loadKeyring, signingKey } from '../packages/host/src/keys';
 import { announcement } from '../packages/host/src/version';
-import { erasureReason } from '../packages/host/src/box';
+import { BoxRuntime, COLD_REFRESH_MIN_MS, erasureReason, INTERNAL } from '../packages/host/src/box';
 import { adminMessage, bodyHashHex, ERASED_ALL, receiptMessage, signReceipt, verifyHostSignature, versionMessage, type ErasureReceipt } from '../packages/host/src/wire';
 import { CLIENTS_DB, COMMANDES_DB, demoStores } from './support/demoData';
-import { HostHarness, MemoryDoStorage, TEST_DOMAIN } from './support/hostHarness';
+import { HostHarness, MemoryDoStorage, TEST_DOMAIN, testHostKey } from './support/hostHarness';
 import { MockFilarr } from './support/mockFilarr';
 import { until } from './support/util';
 
@@ -208,6 +208,42 @@ describe('service hébergé, en mémoire', () => {
     expect(last.calls).toBe((await h.box(accessId).status()).meta!.calls.n);
   }, 30_000);
 
+  it('H3 : seul un appel à la clé AUTHENTIFIÉE compte ; sans clé ou à la mauvaise clé, rien n’est compté ni écrit ; le compteur se verse par lots', async () => {
+    const b = h.box(accessId);
+    const storage = h.storages.get(accessId)!;
+    // La remise horaire des comptes, comme en service (les essais d'avant la font à chaque requête)
+    h.timing.usageEveryMs = 3_600_000;
+    try {
+      await h.settle();
+      await b.alarm();
+      await h.settle();
+      const before = (await b.status()).meta!.calls.n;
+      storage.writes.length = 0;
+      const wrongKey = `gk_live_${toBase64Url(new Uint8Array(24).fill(9))}`;
+      for (let i = 0; i < 40; i += 1) {
+        const res = await h.fetch(box('/v1/clients?limit=1'), i % 2 === 0 ? {} : bearer(wrongKey));
+        expect(res.status).toBe(401);
+      }
+      await h.settle();
+      expect((await b.status()).meta!.calls.n).toBe(before);
+      expect(storage.writes.filter((k) => k === 'host:meta')).toEqual([]);
+      // Le journal de la boîte garde la trace des refus, versé UNE fois pour tout le flot (travail d'après ≤ 1 par 10 s)
+      expect(storage.writes.length).toBeLessThanOrEqual(1);
+
+      storage.writes.length = 0;
+      for (let i = 0; i < 30; i += 1) expect((await h.fetch(box('/v1/clients?limit=1'), bearer(erpKey))).status).toBe(200);
+      await h.settle();
+      expect((await b.status()).meta!.calls.n).toBe(before + 30);
+      // Par lots : au plus une écriture de `host:meta` pour 30 appels (tous les 100 appels ou toutes les 10 s)
+      expect(storage.writes.filter((k) => k === 'host:meta').length).toBeLessThanOrEqual(1);
+      // L'alarme verse le compteur tenu en mémoire
+      await b.alarm();
+      expect((storage.data.get('host:meta') as { calls: { n: number } }).calls.n).toBe(before + 30);
+    } finally {
+      h.timing.usageEveryMs = 0;
+    }
+  }, 30_000);
+
   it('une base retirée de la boîte : sa copie est effacée, reçu PARTIEL signé (withdrawn)', async () => {
     mock.withdrawStore(accessId, commandes, 'vault_admin');
     await h.settle();
@@ -326,6 +362,65 @@ describe('service hébergé, en mémoire', () => {
     expect(redirected.headers.get('location')).toBe('https://gate.example.org/v1/clients?limit=1');
   }, 60_000);
 
+  it('M8 / PH15 : confié de nouveau, l’accès ne reçoit jamais le reçu d’avant ; receipt_unexpected d’un partiel réessayé, receipt_stale jeté', async () => {
+    const four = await mock.createHostedAccess('Quatre', { hostName: 'quatre-ef56', key: h.key.pinned });
+    await mock.grant(four.accessId, clients, 'r');
+    await mock.grant(four.accessId, commandes, 'r');
+    await h.settle();
+    await until(async () => (await h.fetch(`https://quatre-ef56.${TEST_DOMAIN}/health`)).status === 200, 15_000, 'quatre prête');
+    const b = h.box(four.accessId);
+    const firstSince = (await b.status()).meta!.hostingSince;
+    expect(firstSince).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    // Effacement (sommeil échu) : la remise du reçu complet échoue (réponse perdue), il reste en attente
+    mock.receiptFailures = 1000;
+    mock.hostingErase(four.accessId, { revoke: false, reason: 'tier' });
+    await h.settle();
+    await until(async () => (await b.status()).meta!.state === 'erased', 15_000, 'quatre effacée');
+    expect((await b.status()).meta!.receipts).toHaveLength(1);
+
+    // Confié de nouveau (nouveau nom, nouveau scellé) : le reçu de l'hébergement d'avant est jeté sans être remis
+    mock.receiptFailures = 0;
+    await mock.rehost(four.accessId, four.token, { hostName: 'quatre-gh78', key: h.key.pinned });
+    await h.settle();
+    await until(async () => (await h.fetch(`https://quatre-gh78.${TEST_DOMAIN}/health`)).status === 200, 15_000, 'quatre de nouveau');
+    expect((await b.status()).meta!.receipts).toEqual([]);
+    expect((await b.status()).meta!.hostingSince).not.toBe(firstSince);
+    await b.alarm();
+    await h.settle();
+    expect(mock.hostedReceipts.filter((r) => r.accessId === four.accessId)).toEqual([]);
+    const hosting = mock.accesses.get(four.accessId)!.hosting!;
+    expect(hosting.state).toBe('running');
+
+    // Un retrait que l'API n'attend pas encore : `409 receipt_unexpected`, passager pour un partiel ; réessayé à l'alarme
+    mock.withdrawStore(four.accessId, commandes);
+    const waiting = hosting.pendingWithdrawals!;
+    hosting.pendingWithdrawals = [];
+    await h.settle();
+    await until(() => mock.refusedReceipts.some((r) => r.accessId === four.accessId && r.code === 'receipt_unexpected'), 10_000, 'partiel refusé');
+    expect((await b.status()).meta!.receipts).toHaveLength(1);
+    hosting.pendingWithdrawals = waiting;
+    await b.alarm();
+    await h.settle();
+    const partial = mock.hostedReceipts.find((r) => r.accessId === four.accessId && r.partial);
+    expect(partial?.receipt).toMatchObject({ reason: 'withdrawn', hostName: 'quatre-gh78', stores: [{ storeId: commandes }] });
+    expect((await b.status()).meta!.receipts).toEqual([]);
+
+    // Effacé de nouveau, l'API tient une demande PLUS RÉCENTE que le reçu : `409 receipt_stale`, jeté sans réessai
+    mock.receiptFailures = 1;
+    mock.hostingErase(four.accessId, { revoke: false, reason: 'tier' });
+    await h.settle();
+    await until(async () => (await b.status()).meta!.state === 'erased', 15_000, 'quatre effacée de nouveau');
+    expect((await b.status()).meta!.receipts).toHaveLength(1);
+    hosting.eraseRequestedAt = new Date(Date.now() + 60_000).toISOString();
+    await b.alarm();
+    await h.settle();
+    expect(mock.refusedReceipts.some((r) => r.accessId === four.accessId && r.code === 'receipt_stale')).toBe(true);
+    expect((await b.status()).meta!.receipts).toEqual([]);
+    expect(mock.hostedReceipts.filter((r) => r.accessId === four.accessId && !r.partial)).toEqual([]);
+    expect(hosting.state).toBe('erasing');
+  }, 60_000);
+
   it('adresses : contrôle, nom inconnu, autre domaine', async () => {
     expect(await (await h.fetch(`${CTL}/health`)).json()).toMatchObject({ status: 'ok', version: HOST_VERSION });
     expect((await h.fetch(`${CTL}/v1/clients`)).status).toBe(404);
@@ -371,5 +466,35 @@ describe('l’annuaire', () => {
     expect(await d.tombstone('site-ab12', 'AAAAAAAAAAAAAAAAAAAAAA', { to: 'http://pas-https.example.org', until: '2030-01-01T00:00:00.000Z' })).toBe(true);
     expect(await d.lookup('site-ab12')).toEqual({ a: 'AAAAAAAAAAAAAAAAAAAAAA', erased: true });
     expect(await d.register('site-ab12', 'BBBBBBBBBBBBBBBBBBBBBB')).toBe(true);
+  });
+});
+
+describe('une boîte froide (M1)', () => {
+  it('une relève qui n’a rien ouvert est gardée 5 s : un flot de requêtes ne fait pas une lecture signée chacune', async () => {
+    const key = testHostKey('h-froid', 11);
+    let reads = 0;
+    let now = Date.parse('2026-10-27T10:00:00.000Z');
+    // L'API injoignable (503) : chaque lecture du jeton est comptée
+    const fetchImpl = (async () => {
+      reads += 1;
+      return new Response(JSON.stringify({ success: false, code: 'unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+    const env = { GATE_BOX: null, GATE_DIRECTORY: null, GATE_HOST_DOMAIN: TEST_DOMAIN, FILARR_API_URL: 'https://api.example.test', ...key.env } as unknown as ConstructorParameters<typeof BoxRuntime>[0]['env'];
+    const box = new BoxRuntime({
+      storage: new MemoryDoStorage(),
+      waitUntil: () => undefined,
+      env,
+      directory: { register: async () => true, tombstone: async () => true },
+      fetchImpl,
+      now: () => now,
+      ring: loadKeyring(env, [key.pinned]),
+    });
+    const ask = () =>
+      box.fetch(new Request(`https://froide-ab12.${TEST_DOMAIN}/v1/clients`, { headers: { [INTERNAL.route]: 'box', [INTERNAL.access]: 'AAAAAAAAAAAAAAAAAAAAAA', [INTERNAL.name]: 'froide-ab12' } }));
+    for (let i = 0; i < 20; i += 1) expect((await ask()).status).toBe(503);
+    expect(reads).toBe(1);
+    now += COLD_REFRESH_MIN_MS;
+    expect((await ask()).status).toBe(503);
+    expect(reads).toBe(2);
   });
 });

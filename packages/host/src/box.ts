@@ -17,7 +17,8 @@
  *  - L'EFFACEMENT : tout le stockage de l'objet est effacé, la mémoire vidée, puis un reçu signé
  *    (`HOST_SIG`) est remis à l'API ; une base retirée seule donne un reçu partiel ;
  *  - LA GESTION par le créateur, seulement par le canal signé `/_admin/*` (aucune interface web) ;
- *  - LE COMPTE DES APPELS (1 000 000 par mois, `429 hosted_quota_calls`), remis chaque heure ;
+ *  - LE COMPTE DES APPELS (1 000 000 par mois, `429 hosted_quota_calls`), remis chaque heure : seul un appel
+ *    dont la clé d'application est AUTHENTIFIÉE compte ; le compteur vit en mémoire et se verse par lots ;
  *  - L'EXPORT des réglages vers une boîte chez soi (`PUT /api-access/hosted/:id/export`), scellé
  *    vers l'identité en attente après vérification de `bindSig` par la clé ÉPINGLÉE du créateur.
  *
@@ -35,6 +36,7 @@ import { fromBase64Std, parseAccessToken } from '../../core/src/engine/store/api
 import { utf8Decode, type StoreCrypto } from '../../core/src/engine/store/crypto';
 import { curves, storeCrypto } from '../../gate/src/crypto/providers';
 import { wipeIdentity } from '../../gate/src/replica/token';
+import { ApiError } from '../../gate/src/errors';
 import { randomToken } from '../../gate/src/util/bytes';
 import { DirectoryClient } from './directory';
 import { apiUrlOf, domainOf, appOriginOf, HOST_VERSION, userAgent, type HostEnv } from './env';
@@ -64,8 +66,16 @@ export interface BoxDeps {
   crypto?: StoreCrypto;
   /** Le trousseau (essais : des clés de test épinglées) ; sinon les secrets et `docs/hosted-keys.json`. */
   ring?: HostKeyring;
-  /** Essais : les intervalles de relève et de remise des comptes. */
-  timing?: { checkEveryMs?: number; usageEveryMs?: number };
+  /** Essais : les intervalles de relève et de remise des comptes (relus à chaque usage). */
+  timing?: BoxTiming;
+}
+
+export interface BoxTiming {
+  checkEveryMs?: number;
+  usageEveryMs?: number;
+  /** Le compteur des appels se verse tous les `callsSaveEvery` appels ou toutes les `callsSaveMs` ms. */
+  callsSaveEvery?: number;
+  callsSaveMs?: number;
 }
 
 /** Les en-têtes posés par le Worker devant l'objet (jamais ceux du client : il les retire). */
@@ -85,6 +95,16 @@ export const CHECK_EVERY_MS = 5 * 60_000;
 export const USAGE_EVERY_MS = 3_600_000;
 /** Un réveil d'une boîte froide coûte une lecture signée : une par 5 s au plus. */
 const COLD_WAKE_MIN_MS = 5_000;
+/**
+ * Une requête de logiciel sur une boîte froide relit l'état chez l'API ; un résultat qui n'ouvre rien
+ * (`unavailable`, `absent`) est gardé 5 s : un flot de requêtes sans clé ne fait pas une lecture signée chacune.
+ */
+export const COLD_REFRESH_MIN_MS = 5_000;
+/** Le compteur des appels se verse au plus tous les 100 appels ou toutes les 10 s (et à l'alarme). */
+export const CALLS_SAVE_EVERY = 100;
+export const CALLS_SAVE_MS = 10_000;
+/** Après une requête qui n'a pas été comptée (sans clé, clé refusée, santé), le travail d'après une fois par 10 s au plus. */
+export const IDLE_WORK_MIN_MS = 10_000;
 /** Un reçu non remis est réessayé. */
 const RECEIPT_RETRY_MS = 10 * 60_000;
 const ADMIN_MAX_BYTES = 12 * 1024 * 1024;
@@ -96,6 +116,8 @@ const ADMIN_BLOCKED = /^\/(login|logout|setup(\/.*)?|token|password|forget|expor
 export interface PendingReceipt {
   receipt: ErasureReceipt;
   sig: string | null;
+  /** L'hébergement qui l'a produit (`hostingSince`) : un reçu ne se remet jamais pour un autre hébergement. */
+  hosting?: string | null;
 }
 
 export interface BoxMeta {
@@ -112,6 +134,8 @@ export interface BoxMeta {
   initApplied: boolean;
   /** Première fois que l'API a dit « effacer » (`requestedAt` du reçu). */
   erasingSince: string | null;
+  /** L'hébergement en cours : l'heure où la boîte l'a commencé (neuve, ou confiée de nouveau après un effacement). */
+  hostingSince?: string | null;
   receipts: PendingReceipt[];
   /** Après une migration vers chez soi : l'ancienne adresse redirige 30 jours (§ 8.4). */
   redirect?: { to: string; until: string } | null;
@@ -195,9 +219,15 @@ export class BoxRuntime {
   private opening: Promise<void> | null = null;
   private refreshing: Promise<string> | null = null;
   private lastColdMiss = 0;
+  /** La dernière relève chez l'API et son résultat (M1 : gardé 5 s pour les requêtes sur une boîte froide). */
+  private lastRefresh: { at: number; state: string } | null = null;
   private readonly seenAdmin = new Map<string, number>();
-  private readonly checkEveryMs: number;
-  private readonly usageEveryMs: number;
+  /** Les requêtes dont la clé d'application a été authentifiée (donc comptées). */
+  private readonly metered = new WeakSet<Request>();
+  /** Les appels comptés depuis le dernier versement de `host:meta`, et l'heure de ce versement. */
+  private callsUnsaved = 0;
+  private callsSavedAt = 0;
+  private lastIdleWork = 0;
 
   constructor(private readonly deps: BoxDeps) {
     this.env = deps.env;
@@ -207,16 +237,31 @@ export class BoxRuntime {
     const base = deps.fetchImpl ?? fetch;
     this.baseFetch = (input, init) => base(input, init);
     this.ring = deps.ring ?? loadKeyring(this.env);
-    this.checkEveryMs = deps.timing?.checkEveryMs ?? CHECK_EVERY_MS;
-    this.usageEveryMs = deps.timing?.usageEveryMs ?? USAGE_EVERY_MS;
     this.apiUrl = apiUrlOf(this.env);
     this.api = this.apiUrl ? new HostApi(this.apiUrl, () => signingKey(this.ring, this.now()), userAgent, this.baseFetch, this.now) : null;
+  }
+
+  private get checkEveryMs(): number {
+    return this.deps.timing?.checkEveryMs ?? CHECK_EVERY_MS;
+  }
+
+  private get usageEveryMs(): number {
+    return this.deps.timing?.usageEveryMs ?? USAGE_EVERY_MS;
   }
 
   // ==================== Les métadonnées en clair ====================
 
   private async loadMeta(accessId?: string): Promise<BoxMeta | null> {
-    if (!this.meta) this.meta = (await this.storage.get<BoxMeta>(META)) ?? null;
+    if (!this.meta) {
+      const stored = (await this.storage.get<BoxMeta>(META)) ?? null;
+      // Une boîte d'avant `hostingSince` : l'hébergement en cours commence ici, ses reçus en attente sont les siens
+      if (stored && !stored.hostingSince) {
+        const since = new Date(this.now()).toISOString();
+        stored.hostingSince = since;
+        stored.receipts = stored.receipts.map((p) => ({ ...p, hosting: p.hosting ?? since }));
+      }
+      this.meta = stored;
+    }
     if (!this.meta && accessId) {
       this.meta = {
         v: 1,
@@ -229,6 +274,7 @@ export class BoxRuntime {
         stores: [],
         initApplied: false,
         erasingSince: null,
+        hostingSince: new Date(this.now()).toISOString(),
         receipts: [],
         calls: { period: periodOf(this.now()), n: 0, reported: 0, reportedAt: 0 },
         checkedAt: 0,
@@ -239,7 +285,10 @@ export class BoxRuntime {
   }
 
   private async saveMeta(): Promise<void> {
-    if (this.meta) await this.storage.put(META, this.meta);
+    if (!this.meta) return;
+    this.callsUnsaved = 0;
+    this.callsSavedAt = this.now();
+    await this.storage.put(META, this.meta);
   }
 
   /** Pour les essais et l'exploitation : l'état sans contenu. */
@@ -249,6 +298,7 @@ export class BoxRuntime {
 
   /** Vide la mémoire sans rien effacer (essais, arrêt de l'objet). */
   async dispose(): Promise<void> {
+    await this.flushCalls(true);
     await this.close(true);
   }
 
@@ -276,9 +326,20 @@ export class BoxRuntime {
    */
   refresh(): Promise<string> {
     if (!this.refreshing) {
-      this.refreshing = this.refreshInner().finally(() => {
-        this.refreshing = null;
-      });
+      this.refreshing = this.refreshInner()
+        .then(
+          (state) => {
+            this.lastRefresh = { at: this.now(), state };
+            return state;
+          },
+          (err: unknown) => {
+            this.lastRefresh = { at: this.now(), state: 'unavailable' };
+            throw err;
+          }
+        )
+        .finally(() => {
+          this.refreshing = null;
+        });
     }
     return this.refreshing;
   }
@@ -303,14 +364,22 @@ export class BoxRuntime {
       if (meta.state !== 'erased' || meta.receipts.length > 0) await this.erase(t, t.state === 'erasing');
       return 'erased';
     }
+    // Un autre nom que celui que la boîte tenait : un autre hébergement (le nom ne change jamais au sein d'un même)
+    const otherName = meta.hostName !== null && meta.hostName !== t.hostName;
     meta.hostName = t.hostName;
     meta.keyId = t.keyId;
-    if (meta.state === 'erased') {
-      // Un accès effacé puis confié de nouveau (nouveau nom, nouveau jeton scellé) : une boîte neuve
-      meta.state = 'running';
-      meta.stores = [];
-      meta.initApplied = false;
-      meta.erasingSince = null;
+    if (meta.state === 'erased' || otherName) {
+      // Un accès effacé puis confié de nouveau (nouveau nom, nouveau jeton scellé) : une boîte neuve, et les reçus de
+      // l'hébergement d'avant ne se remettent JAMAIS pour celui-ci (l'API les prendrait pour les siens, M8)
+      if (otherName && meta.state !== 'erased') opsError('hosting_changed');
+      meta.hostingSince = new Date(this.now()).toISOString();
+      meta.receipts = [];
+      if (meta.state === 'erased') {
+        meta.state = 'running';
+        meta.stores = [];
+        meta.initApplied = false;
+        meta.erasingSince = null;
+      }
     }
     if (t.state === 'asleep') {
       await this.sleep(t.sleepReason, t.sleepUntil);
@@ -387,6 +456,11 @@ export class BoxRuntime {
     }
     // Le canal de gestion entre par le canal local de la boîte, avec un secret qui ne vit qu'ici
     gate.cliSecret = randomToken(24);
+    // Le compte des appels : seulement après l'authentification de la clé d'application (H3)
+    gate.api.meter = (_key, request) => {
+      this.metered.add(request);
+      this.meterCall();
+    };
     this.gate = gate;
     this.kBox = kBox;
     this.aNotify = aNotify;
@@ -523,7 +597,9 @@ export class BoxRuntime {
       meta.sleepReason = null;
       meta.sleepUntil = null;
       meta.initApplied = false;
-      if (sendReceipt) meta.receipts = [...meta.receipts, this.sign({ receipt, sig: null })];
+      // PH15 : une fois l'effacement demandé, plus aucun reçu partiel ne se remet ; seul le reçu complet part
+      meta.receipts = meta.receipts.filter((p) => p.receipt.reason !== 'withdrawn');
+      if (sendReceipt) meta.receipts = [...meta.receipts, { ...this.sign({ receipt, sig: null }), hosting: meta.hostingSince ?? null }];
       await this.saveMeta();
       const redirect = t.redirectTo && t.redirectUntil && /^https:\/\/[^\s]+$/.test(t.redirectTo) && Date.parse(t.redirectUntil) > this.now() ? { to: t.redirectTo, until: t.redirectUntil } : null;
       meta.redirect = redirect;
@@ -533,13 +609,21 @@ export class BoxRuntime {
     await this.flushReceipts();
   }
 
-  /** Remet les reçus en attente ; ce qui échoue est réessayé par l'alarme. */
+  /** Un reçu de l'hébergement en cours (même `hostingSince`, même nom) ; tout autre est jeté sans être remis. */
+  private ofThisHosting(p: PendingReceipt): boolean {
+    const meta = this.meta!;
+    return (p.hosting ?? null) === (meta.hostingSince ?? null) && p.receipt.hostName === (meta.hostName ?? '');
+  }
+
+  /** Remet les reçus en attente (de l'hébergement en cours seulement) ; ce qui échoue est réessayé par l'alarme. */
   private async flushReceipts(): Promise<void> {
     const meta = this.meta!;
     if (!this.api || meta.receipts.length === 0) return;
     const left: PendingReceipt[] = [];
     for (const raw of meta.receipts) {
-      const p = this.sign(raw);
+      if (!this.ofThisHosting(raw)) continue;
+      if (meta.state === 'erased' && raw.receipt.reason === 'withdrawn') continue;
+      const p = { ...this.sign(raw), hosting: raw.hosting ?? null };
       if (!p.sig) {
         left.push(p);
         continue;
@@ -547,9 +631,17 @@ export class BoxRuntime {
       try {
         await this.api.receipt(meta.accessId, p.receipt, p.sig);
       } catch (err) {
-        // Un reçu que l'API refuse pour sa forme ne passera jamais : on ne le garde pas
-        if (!(err instanceof HostApiError && (err.status === 400 || err.status === 404))) left.push(p);
-        if (!(err instanceof HostApiError)) opsError('receipt_failed');
+        if (!(err instanceof HostApiError)) {
+          opsError('receipt_failed');
+          left.push(p);
+          continue;
+        }
+        // Jeté, définitivement : refusé pour sa forme (400, 404) ; `409 receipt_stale`, d'un autre hébergement ou
+        // antérieur à la demande (PH15) ; `409 receipt_unexpected` pour un reçu complet (l'API n'efface plus rien).
+        // `receipt_unexpected` d'un reçu PARTIEL est passager : réessayé. Toute autre erreur : réessayée.
+        const definitive =
+          err.status === 400 || err.status === 404 || err.code === 'receipt_stale' || (err.code === 'receipt_unexpected' && p.receipt.reason !== 'withdrawn');
+        if (!definitive) left.push(p);
       }
     }
     meta.receipts = left;
@@ -584,7 +676,7 @@ export class BoxRuntime {
     }
     for (const s of gone) {
       const at = new Date(this.now()).toISOString();
-      meta.receipts.push(this.sign({ receipt: this.buildReceipt(meta, 'withdrawn', [s], ['dbKeys', 'copy'], at, causes.get(s.storeId)), sig: null }));
+      meta.receipts.push({ ...this.sign({ receipt: this.buildReceipt(meta, 'withdrawn', [s], ['dbKeys', 'copy'], at, causes.get(s.storeId)), sig: null }), hosting: meta.hostingSince ?? null });
     }
     meta.stores = held;
     await this.saveMeta();
@@ -715,11 +807,18 @@ export class BoxRuntime {
       await gate.settle().catch(() => undefined);
     }
     await this.reportUsage(false);
+    await this.flushCalls(false);
   }
 
   // ==================== Alarme ====================
 
   async alarm(): Promise<void> {
+    await this.alarmInner();
+    // L'alarme verse toujours le compteur des appels tenu en mémoire
+    await this.flushCalls(true);
+  }
+
+  private async alarmInner(): Promise<void> {
     const meta = await this.loadMeta();
     if (!meta) return;
     if (meta.state === 'erased') {
@@ -740,6 +839,8 @@ export class BoxRuntime {
     }
     await this.gate?.onAlarm().catch(() => undefined);
     await this.afterWork();
+    // Un reçu partiel resté en attente (API injoignable, `409 receipt_unexpected` passager) : réessayé ici
+    if (meta.receipts.length > 0) await this.flushReceipts();
   }
 
   // ==================== Appels de la boîte (§ 7.3) ====================
@@ -750,22 +851,48 @@ export class BoxRuntime {
     return typeof n === 'number' && Number.isSafeInteger(n) && n > 0 ? n : HOSTED_CALLS_PER_MONTH;
   }
 
-  /** Compte un appel ; rend la réponse de refus si le mois est épuisé. */
-  private async countCall(): Promise<Response | null> {
-    const meta = this.meta!;
+  /**
+   * Compte un appel dont la clé d'application est AUTHENTIFIÉE (appelé par l'API de la boîte, H3) ; lève le refus
+   * `429 hosted_quota_calls` si le mois est épuisé. Rien n'est écrit ici : le compteur vit en mémoire et se verse
+   * par lots (`flushCalls`).
+   */
+  private meterCall(): void {
+    const meta = this.meta;
+    if (!meta) return;
     const now = this.now();
     const period = periodOf(now);
     if (meta.calls.period !== period) {
-      await this.reportUsage(true);
-      meta.calls = { period, n: 0, reported: 0, reportedAt: meta.calls.reportedAt };
+      // Le mois change : le total du mois fini part à l'API (rejouable), le compte repart de zéro
+      const done = meta.calls;
+      meta.calls = { period, n: 0, reported: 0, reportedAt: done.reportedAt };
+      this.callsUnsaved += 1;
+      if (done.n > done.reported) this.deps.waitUntil(this.reportPeriod(done.period, done.n));
     }
     if (meta.calls.n >= this.callLimit()) {
       const retry = Math.max(1, Math.ceil((nextMonthUtc(now) - now) / 1000));
-      return json(429, { error: 'Monthly calls of this hosted box are used up', code: 'hosted_quota_calls', remedy: ['wait'], retryAfter: retry }, { 'Retry-After': String(retry) });
+      throw new ApiError(429, 'hosted_quota_calls', 'Monthly calls of this hosted box are used up', { remedy: ['wait'], retryAfter: retry });
     }
     meta.calls.n += 1;
-    await this.saveMeta();
-    return null;
+    this.callsUnsaved += 1;
+  }
+
+  /** Verse le compteur des appels : `force` (alarme, arrêt), sinon tous les N appels ou toutes les N secondes. */
+  private async flushCalls(force: boolean): Promise<void> {
+    if (this.callsUnsaved === 0 || !this.meta) return;
+    const every = this.deps.timing?.callsSaveEvery ?? CALLS_SAVE_EVERY;
+    const ms = this.deps.timing?.callsSaveMs ?? CALLS_SAVE_MS;
+    if (force || this.callsUnsaved >= every || this.now() - this.callsSavedAt >= ms) await this.saveMeta();
+  }
+
+  /** Le total d'un mois fini, remis à l'API (l'API garde le plus grand). */
+  private async reportPeriod(period: string, calls: number): Promise<void> {
+    const meta = this.meta;
+    if (!meta || !this.api) return;
+    try {
+      await this.api.usage([{ accessId: meta.accessId, period, calls }]);
+    } catch {
+      opsError('usage_failed');
+    }
   }
 
   /** Remet le total du mois (rejouable : l'API garde le plus grand). `force` : avant de changer de mois. */
@@ -798,7 +925,10 @@ export class BoxRuntime {
     if (path === '/_filarr' || path.startsWith('/_filarr/') || path === '/admin' || path.startsWith('/admin/') || path === '/metrics') return notFound();
     if (meta.hostName && hostName !== meta.hostName) return notFound();
     if (!this.gate && meta.state !== 'asleep') {
-      const state = await this.refresh().catch(() => 'unavailable');
+      // M1 : une relève qui n'a rien ouvert il y a moins de 5 s fait foi (pas une lecture signée par requête)
+      const last = this.lastRefresh;
+      const recent = last && this.now() - last.at < COLD_REFRESH_MIN_MS && (last.state === 'unavailable' || last.state === 'absent') ? last.state : null;
+      const state = recent ?? (await this.refresh().catch(() => 'unavailable'));
       if (state === 'erased' || state === 'absent') return notFound();
       if (state === 'unavailable' && !this.gate) return json(503, { error: 'Box unavailable, retry shortly', code: 'box_unavailable' }, { 'Retry-After': '30' });
     }
@@ -817,14 +947,18 @@ export class BoxRuntime {
         return json(200, { status: r.link === 'connecting' && bases.length === 0 ? 'preparing' : ready ? 'ok' : 'degraded', link: r.link, version: HOST_VERSION });
       }
       if (path === '/_admin' || path.startsWith('/_admin/')) return await this.handleAdmin(request, url, gate);
-      const counted = path.startsWith('/v1/') || path === '/mcp' || path === '/openapi.json' || path === '/docs';
-      if (counted && request.method !== 'OPTIONS') {
-        const refused = await this.countCall();
-        if (refused) return refused;
-      }
+      // Le compte des appels se fait DANS l'API, après l'authentification de la clé (`meterCall`)
       return await gate.api.handle(request, { remoteAddress: request.headers.get('cf-connecting-ip') ?? '' });
     } finally {
-      this.deps.waitUntil(this.afterWork().catch(() => undefined));
+      // Une requête comptée ou de gestion : le travail d'après tout de suite ; une autre (sans clé, clé refusée,
+      // santé) ne fait pas une écriture chacune : le travail d'après au plus une fois par 10 s
+      const now = this.now();
+      if (this.metered.has(request) || path === '/_admin' || path.startsWith('/_admin/')) {
+        this.deps.waitUntil(this.afterWork().catch(() => undefined));
+      } else if (now - this.lastIdleWork >= IDLE_WORK_MIN_MS) {
+        this.lastIdleWork = now;
+        this.deps.waitUntil(this.afterWork().catch(() => undefined));
+      }
     }
   }
 

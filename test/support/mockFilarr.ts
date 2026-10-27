@@ -154,6 +154,29 @@ interface MockAccess {
   hosting?: MockHosting | null;
 }
 
+/**
+ * PH15 : le refus d'un reçu qui n'est pas celui de l'hébergement en cours (miroir de `receiptRefusal` du worker) :
+ * `receipt_stale` (autre nom, ou antérieur à la demande : définitif), `receipt_unexpected` (état qui ne l'attend pas).
+ */
+function mockReceiptRefusal(r: Record<string, unknown>, h: MockHosting): 'receipt_stale' | 'receipt_unexpected' | null {
+  const asked = typeof r.requestedAt === 'string' ? Date.parse(r.requestedAt) : NaN;
+  if (r.hostName !== h.hostName) return 'receipt_stale';
+  if (!Number.isFinite(asked)) return 'receipt_stale';
+  if (r.reason !== 'withdrawn') {
+    if (h.state !== 'erasing') return 'receipt_unexpected';
+    if (h.eraseRequestedAt && !(asked >= Date.parse(h.eraseRequestedAt))) return 'receipt_stale';
+    return null;
+  }
+  const stores = Array.isArray(r.stores) ? (r.stores as Array<{ storeId?: unknown }>) : [];
+  if (stores.length === 0) return 'receipt_unexpected';
+  for (const s of stores) {
+    const w = (h.pendingWithdrawals ?? []).find((p) => p.storeId === s?.storeId);
+    if (!w) return 'receipt_unexpected';
+    if (!(asked >= Date.parse(w.at))) return 'receipt_stale';
+  }
+  return null;
+}
+
 /** La ligne `api_access_hosting` du worker, en mémoire. */
 export interface MockHosting {
   hostName: string;
@@ -168,7 +191,7 @@ export interface MockHosting {
   eraseReason?: string | null;
   eraseRequestedAt?: string | null;
   /** PH10 : les bases sorties dont le reçu partiel n'est pas encore remis (absent : une API d'avant). */
-  pendingWithdrawals?: Array<{ storeId: string; cause: string; at: string }>;
+  pendingWithdrawals?: Array<{ storeId: string; cause?: string; at: string }>;
 }
 
 export interface MockDeposit {
@@ -547,6 +570,10 @@ export class MockFilarr {
   hostedKill = false;
   /** Le barème des appels d'une boîte hébergée, servi dans `self.limits` (`hostedCallsPerMonth`). */
   hostedCallsPerMonth: number | null = null;
+  /** Essais : les N prochaines remises de reçu échouent (500), comme une réponse perdue. */
+  receiptFailures = 0;
+  /** PH15 : les reçus refusés `409 receipt_stale` / `receipt_unexpected` (rien n'est effacé ni noté). */
+  readonly refusedReceipts: Array<{ accessId: string; code: string; receipt: Record<string, unknown> }> = [];
   readonly hostedReceipts: Array<{ accessId: string; receipt: Record<string, unknown>; sig: string; partial: boolean }> = [];
   readonly hostedVersions: Array<Record<string, unknown>> = [];
   readonly hostedUsage: Array<{ accessId: string; period: string; calls: number }> = [];
@@ -592,6 +619,18 @@ export class MockFilarr {
     return { token, accessId };
   }
 
+  /**
+   * L'accès confié DE NOUVEAU après un effacement (`POST /api-access/:id/hosting`) : la ligne d'hébergement d'avant
+   * est remplacée par une neuve (nouveau nom, nouveau scellé du même jeton), en service, et la boîte est réveillée.
+   */
+  async rehost(accessId: string, token: string, opts: { hostName: string; key: PinnedHostKey }): Promise<void> {
+    const access = this.accesses.get(accessId)!;
+    access.revoked = false;
+    const sealed = await sealToken(c, curves, { a: accessId, k: opts.key.id, t: token, v: 1 }, opts.key.encPublicKey);
+    access.hosting = { hostName: opts.hostName, keyId: opts.key.id, sealedToken: sealed, state: 'running', sleepReason: null, sleepUntil: null, redirectTo: null, redirectUntil: null };
+    this.signal(access, { t: 'hosting', state: 'running' });
+  }
+
   /** Le cron endort une boîte (impayé, palier, politique) : 30 jours. */
   hostingSleep(accessId: string, reason: string): void {
     const h = this.accesses.get(accessId)!.hosting!;
@@ -632,7 +671,8 @@ export class MockFilarr {
   /** Une base sort de la boîte (créateur ou administrateur du coffre) : le droit part, la boîte est réveillée. */
   withdrawStore(accessId: string, storeId: string, cause?: 'creator' | 'vault_admin' | 'consent'): void {
     const access = this.accesses.get(accessId)!;
-    if (cause && access.hosting) access.hosting.pendingWithdrawals = [...(access.hosting.pendingWithdrawals ?? []), { storeId, cause, at: new Date().toISOString() }];
+    // PH15 : tout retrait attend son reçu partiel (la cause est facultative, PH10)
+    if (access.hosting) access.hosting.pendingWithdrawals = [...(access.hosting.pendingWithdrawals ?? []), { storeId, ...(cause ? { cause } : {}), at: new Date().toISOString() }];
     access.grants.delete(storeId);
     access.manifests.delete(storeId);
     this.signal(access, { t: 'grant' });
@@ -723,12 +763,24 @@ export class MockFilarr {
       return ok({ size: Buffer.from(sealed, 'base64').length });
     }
     if (m[2] === 'receipt' && method === 'POST') {
+      if (this.receiptFailures > 0) {
+        this.receiptFailures -= 1;
+        return refuse(500, 'internal');
+      }
       const b = parsed();
       const receipt = b?.receipt as Record<string, unknown> | undefined;
       const sig = b?.sig;
       const key = receipt ? this.hostKeyOf(receipt.keyId)[0] : undefined;
       if (!receipt || receipt.accessId !== access.id || typeof sig !== 'string' || !key || !verifyHostSignature(receiptMessage(receipt), sig, key.signPublicKey)) return refuse(400, 'invalid');
+      // Le même reçu remis deux fois : déjà noté, rien de plus
+      if (this.hostedReceipts.some((r) => r.sig === sig)) return ok({ state: h.state });
       const partial = receipt.reason === 'withdrawn';
+      // PH15 (revue M8) : un reçu se lie à l'hébergement EN COURS, comme `receiptRefusal` du worker
+      const refusal = mockReceiptRefusal(receipt, h);
+      if (refusal) {
+        this.refusedReceipts.push({ accessId: access.id, code: refusal, receipt });
+        return refuse(409, refusal);
+      }
       if (partial && h.pendingWithdrawals) {
         const gone = new Set(((receipt.stores ?? []) as Array<{ storeId: string }>).map((x) => x.storeId));
         h.pendingWithdrawals = h.pendingWithdrawals.filter((w) => !gone.has(w.storeId));

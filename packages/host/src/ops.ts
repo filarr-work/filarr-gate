@@ -19,6 +19,7 @@ export const OPS_CODES = [
   'announce_failed',
   'directory_failed',
   'erase_failed',
+  'hosting_changed',
 ] as const;
 
 export type OpsCode = (typeof OPS_CODES)[number];

@@ -47,8 +47,17 @@ interface Ctx {
   cors: Record<string, string>;
 }
 
+/**
+ * Le compteur d'un hôte (le service hébergé : un million d'appels par mois et par boîte) : appelé APRÈS
+ * l'authentification de la clé d'application, jamais pour une requête sans clé ou dont la clé est refusée. Il
+ * peut refuser l'appel en levant une `ApiError` (429 du mois épuisé).
+ */
+export type ApiMeter = (key: AppKeyRecord, request: Request) => void;
+
 export class ApiServer {
   private idempotency = new Map<string, Idem>();
+  /** Le compteur de l'hôte, s'il en a un (aucun chez soi). */
+  meter: ApiMeter | null = null;
 
   constructor(private readonly g: GateCore) {}
 
@@ -112,6 +121,8 @@ export class ApiServer {
     if (check.refusal) {
       throw new ApiError(check.refusal.status, check.refusal.code, check.refusal.message, check.refusal.retryAfter ? { retryAfter: check.refusal.retryAfter } : {});
     }
+    // Compté seulement ici : la clé est authentifiée (une requête sans clé, ou à la clé refusée, ne compte pas)
+    this.meter?.(check.key!, request);
     return check.key!;
   }
 
