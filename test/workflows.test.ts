@@ -5,7 +5,7 @@
  * Lecture des fichiers seulement : rien n'est déclenché.
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { checkTag, parseSigners } from '../scripts/release/tag-check.mjs';
@@ -61,8 +61,9 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
 ];
 
 describe('la chaîne de publication (.github)', () => {
-  it('existe : ci.yml, release.yml, deploy-host.yml, release-signers', () => {
+  it('existe : ci.yml, release.yml, deploy-host.yml, release-signers, CODEOWNERS', () => {
     expect(workflows.sort()).toEqual(['ci.yml', 'deploy-host.yml', 'release.yml']);
+    expect(existsSync(join(gh, 'CODEOWNERS'))).toBe(true);
     expect(read(gh, 'release-signers')).toContain('allowed_signers');
   });
 
@@ -152,6 +153,32 @@ describe('la chaîne de publication (.github)', () => {
     expect(image).toContain('platforms: linux/amd64,linux/arm64');
     expect(image).toContain('*OWNER*|*NAME*');
     expect(all.get('journal')!.body).toContain('journal.mjs" append journal.jsonl --kind published');
+  });
+
+  it('CODEOWNERS : la chaîne, le service hébergé et la liste de ses clés ont un propriétaire (revue H1)', () => {
+    const rules = read(gh, 'CODEOWNERS')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'))
+      .map((l) => l.split(/\s+/));
+    const covered = ['/.github/', '/scripts/release/', '/packages/host/', '/docs/hosted-keys.json'];
+    for (const path of covered) {
+      // La DERNIÈRE règle qui correspond l'emporte (GitHub) : celle de ce chemin, ou d'un parent, doit nommer le propriétaire
+      const last = rules.filter(([p]) => path.startsWith(p!.replace(/\*$/, ''))).at(-1);
+      expect(last, path).toBeDefined();
+      expect(last!.slice(1), path).toEqual(['@matbel91765']);
+      expect(existsSync(join(repo, path)), path).toBe(true);
+    }
+    for (const [, ...who] of rules) for (const w of who) expect(w).toMatch(/^@[\w-]+(\/[\w-]+)?$/);
+  });
+
+  it.each(workflows)('%s : un travail qui lit un secret (autre que le jeton du dépôt) ne lance aucun script d’installation (revue M6)', (name) => {
+    for (const [job, { body }] of jobs(read(gh, 'workflows', name))) {
+      if (!/secrets\.(?!GITHUB_TOKEN\b)[A-Z_]+/.test(body)) continue;
+      expect(body, job).not.toMatch(/cache: npm/);
+      const installs = body.split('\n').filter((x) => /\bnpm (ci|install|i)\b/.test(x));
+      for (const l of installs) expect(l, `${job} : ${l}`).toContain('--ignore-scripts');
+    }
   });
 
   it('release-signers : une clé release et une clé security, distinctes ; une étiquette signée par une clé de test est refusée', async () => {

@@ -1,0 +1,9 @@
+# Propriétaires du code (revue de sécurité interne, H1) : toute modification de la chaîne de publication et de
+# mise en service, du service hébergé et de la liste publique de ses clés demande la relecture du propriétaire.
+# Le compte personnel reste propriétaire ; l'organisation filarr-work le deviendra plus tard.
+# Une règle n'a d'effet qu'avec la protection de la branche par défaut (« Require review from Code Owners »).
+
+/.github/ @matbel91765
+/scripts/release/ @matbel91765
+/packages/host/ @matbel91765
+/docs/hosted-keys.json @matbel91765

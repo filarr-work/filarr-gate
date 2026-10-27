@@ -9,15 +9,20 @@
 # DÉJÀ PUBLIÉE par release.yml :
 #   1. l'étiquette est annotée et SIGNÉE par une clé de .github/release-signers (lus sur la branche par défaut,
 #      jamais dans l'arbre étiqueté), relue deux fois (tag-check.mjs, puis git verify-tag) ;
-#   2. elle a son entrée « published » au journal public (branche release-journal), avec la même empreinte du code
-#      que la publication téléchargée (`codeHash` = sha256 du SHA256SUMS, PH7), et le module du service y est compté ;
+#   2. elle a son entrée « published » au journal public (branche release-journal), UNE, dont le COMMIT est celui de
+#      l'étiquette signée et l'empreinte du code celle de la publication téléchargée (`codeHash` = sha256 du
+#      SHA256SUMS, PH7) ; le journal est celui de la chaîne : linéaire, chaque commit du robot `github-actions[bot]`,
+#      des lignes ajoutées seulement, et l'activité du dépôt chez GitHub ne montre que des poussées du robot, sans
+#      poussée forcée ni suppression (revue H1) ;
 #   3. SEPT JOURS au moins depuis `publishedAt` de cette entrée (la date de réception de l'étiquette par la chaîne,
 #      jamais la date que porte l'étiquette) — sauf correctif de sécurité ACCEPTÉ (PH5) : étiquette vX.Y.Z-security
 #      signée par une clé de rôle security, lignes Filarr-Release-Kind et Filarr-Advisory, avis existant, version qui
 #      descend de la dernière version EN SERVICE ; une condition manque → publication ordinaire (sept jours) ;
-#   4. les essais repassent sur le commit étiqueté, et le module se reconstruit à l'identique ;
-#   5. wrangler deploy du module PUBLIÉ, tel quel (--no-bundle), avec l'empreinte, l'étiquette et la date de mise en
-#      service en variables (l'annonce de version, § 7.4) ; l'annonce servie est relue ;
+#   4. les essais repassent sur l'arbre de L'ÉTIQUETTE (refs/tags/…, jamais un commit lu au journal), et le module du
+#      service est REBÂTI depuis elle : son SHA-256 doit être celui que SHA256SUMS de la publication annonce ;
+#   5. wrangler deploy du module REBÂTI (transmis par artefact, empreinte revérifiée), tel quel (--no-bundle), avec
+#      l'empreinte, l'étiquette et la date de mise en service en variables (l'annonce de version, § 7.4) ; dans ce
+#      travail, AUCUN script d'installation ne tourne (npm ci --ignore-scripts, revue M6) ; l'annonce servie est relue ;
 #   6. l'entrée « deployed » (ou « security ») du journal public.
 #
 # Actions figées par SHA de commit, la version en commentaire (voir l'en-tête de release.yml pour en changer).
@@ -51,7 +56,9 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.decide.outputs.version }}
-      commit: ${{ steps.decide.outputs.commit }}
+      # Le commit de l'ÉTIQUETTE SIGNÉE (tag-check), que le journal doit nommer (étape « même commit »)
+      commit: ${{ steps.check.outputs.commit }}
+      module_sha256: ${{ steps.module.outputs.sha256 }}
       entry_kind: ${{ steps.decide.outputs.entry_kind }}
       code_hash: ${{ steps.decide.outputs.code_hash }}
       published_at: ${{ steps.decide.outputs.published_at }}
@@ -90,8 +97,15 @@ jobs:
           for f in .github/release-signers scripts/release/tag-check.mjs scripts/release/journal.mjs scripts/release/host-deploy.mjs; do
             git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/$(basename "$f")"
           done
-          git fetch --no-tags origin refs/heads/release-journal
-          git show "FETCH_HEAD:journal.jsonl" > "$RUNNER_TEMP/journal.jsonl"
+          git fetch --no-tags origin "+refs/heads/release-journal:refs/remotes/origin/release-journal"
+          git rev-parse refs/remotes/origin/release-journal > "$RUNNER_TEMP/journal-tip"
+          git show "refs/remotes/origin/release-journal:journal.jsonl" > "$RUNNER_TEMP/journal.jsonl"
+      - name: Qui a poussé sur release-journal, et comment (activité du dépôt chez GitHub)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/activity?ref=refs/heads/release-journal&per_page=100" \
+            --jq '.[] | {activity_type, ref, before, after, actor: .actor.login}' > "$RUNNER_TEMP/journal-activity.jsonl"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -108,15 +122,20 @@ jobs:
         env:
           TAG: ${{ steps.tag.outputs.tag }}
         run: git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$RUNNER_TEMP/release-signers" verify-tag "$TAG"
-      - name: Le commit étiqueté est publié sur une branche du dépôt
+      - name: Le commit étiqueté est celui que la signature couvre, publié sur une branche du dépôt
         env:
           TAG: ${{ steps.tag.outputs.tag }}
+          TAG_COMMIT: ${{ steps.check.outputs.commit }}
         run: |
           commit="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          if [ -z "$TAG_COMMIT" ] || [ "$commit" != "$TAG_COMMIT" ]; then
+            echo "::error::l'étiquette vise $commit, l'objet signé nomme ${TAG_COMMIT:-rien}"; exit 1
+          fi
           if [ -z "$(git branch -r --contains "$commit")" ]; then
             echo "::error::le commit $commit n'est sur aucune branche du dépôt"; exit 1
           fi
       - name: Le module du service, téléchargé de la publication et compté dans son SHA256SUMS
+        id: module
         env:
           TAG: ${{ steps.tag.outputs.tag }}
           VERSION: ${{ steps.check.outputs.version }}
@@ -130,6 +149,7 @@ jobs:
           if [ -z "$want" ] || [ "$want" != "$got" ]; then
             echo "::error::le module du service est absent de SHA256SUMS, ou ses octets diffèrent"; exit 1
           fi
+          echo "sha256=$want" >> "$GITHUB_OUTPUT"
       - name: La version en service, et la gravité de l'avis d'un correctif
         id: context
         env:
@@ -149,18 +169,28 @@ jobs:
             severity="$(gh api "repos/$GITHUB_REPOSITORY/security-advisories/$ADVISORY" --jq .severity || true)"
           fi
           { echo "ancestor=$ancestor"; echo "severity=$severity"; } >> "$GITHUB_OUTPUT"
-      - name: Sept jours depuis l'entrée « published », ou correctif de sécurité accepté
+      - name: Journal de la chaîne, même commit que l'étiquette, sept jours ou correctif de sécurité accepté
         id: decide
         env:
           TAG: ${{ steps.tag.outputs.tag }}
+          TAG_COMMIT: ${{ steps.check.outputs.commit }}
           KIND: ${{ steps.check.outputs.kind }}
           ADVISORY: ${{ steps.check.outputs.advisory }}
           SEVERITY: ${{ steps.context.outputs.severity }}
           ANCESTOR: ${{ steps.context.outputs.ancestor }}
         run: >-
-          node "$RUNNER_TEMP/host-deploy.mjs" decide --journal "$RUNNER_TEMP/journal.jsonl" --tag "$TAG"
+          node "$RUNNER_TEMP/host-deploy.mjs" decide --tag "$TAG" --tag-commit "$TAG_COMMIT"
+          --journal-ref "$(cat "$RUNNER_TEMP/journal-tip")" --activity "$RUNNER_TEMP/journal-activity.jsonl"
           --sums "$RUNNER_TEMP/release/SHA256SUMS" --kind "$KIND" --advisory "$ADVISORY" --severity "$SEVERITY"
           --ancestor "$ANCESTOR" --github-output "$GITHUB_OUTPUT"
+      - name: Le commit de l'entrée du journal est celui de l'étiquette vérifiée
+        env:
+          CHECK_COMMIT: ${{ steps.check.outputs.commit }}
+          DECIDE_COMMIT: ${{ steps.decide.outputs.commit }}
+        run: |
+          if [ -z "$CHECK_COMMIT" ] || [ "$CHECK_COMMIT" != "$DECIDE_COMMIT" ]; then
+            echo "::error::le journal nomme ${DECIDE_COMMIT:-rien}, l'étiquette signée vise ${CHECK_COMMIT:-rien}"; exit 1
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: host-release
@@ -184,15 +214,23 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   test:
-    name: Essais sur le commit étiqueté, module reconstruit à l'identique
+    name: Essais sur l'étiquette, module rebâti depuis elle et comparé à SHA256SUMS
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Aucun secret ici : la construction (et ses scripts d'installation) tourne loin du jeton de déploiement
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ needs.verify.outputs.commit }}
+          ref: refs/tags/${{ needs.verify.outputs.tag }}
           persist-credentials: false
+      - name: L'arbre extrait est celui de l'étiquette vérifiée
+        env:
+          COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          if [ -z "$COMMIT" ] || [ "$(git rev-parse HEAD)" != "$COMMIT" ]; then
+            echo "::error::l'étiquette vise maintenant $(git rev-parse HEAD), la vérification portait sur ${COMMIT:-rien}"; exit 1
+          fi
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -207,15 +245,26 @@ jobs:
         with:
           name: host-release
           path: ${{ runner.temp }}/release
-      - name: Le module se reconstruit octet pour octet depuis l'étiquette
+      - name: Le module rebâti depuis l'étiquette a l'empreinte que SHA256SUMS annonce
         env:
           VERSION: ${{ needs.verify.outputs.version }}
+          MODULE_SHA256: ${{ needs.verify.outputs.module_sha256 }}
         run: |
-          node scripts/host/build.mjs --outfile "$RUNNER_TEMP/rebuilt.js"
-          cmp "$RUNNER_TEMP/rebuilt.js" "$RUNNER_TEMP/release/filarr-gate-host-$VERSION.js"
+          mkdir -p "$RUNNER_TEMP/module"
+          node scripts/host/build.mjs --outfile "$RUNNER_TEMP/module/filarr-gate-host-$VERSION.js"
+          got="$(sha256sum "$RUNNER_TEMP/module/filarr-gate-host-$VERSION.js" | cut -d' ' -f1)"
+          if [ -z "$MODULE_SHA256" ] || [ "$got" != "$MODULE_SHA256" ]; then
+            echo "::error::le module rebâti ($got) n'est pas celui de SHA256SUMS (${MODULE_SHA256:-rien})"; exit 1
+          fi
+          cmp "$RUNNER_TEMP/module/filarr-gate-host-$VERSION.js" "$RUNNER_TEMP/release/filarr-gate-host-$VERSION.js"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: host-module
+          path: ${{ runner.temp }}/module
+          if-no-files-found: error
 
   deploy:
-    name: Mise en service (wrangler deploy du module publié)
+    name: Mise en service (wrangler deploy du module rebâti)
     needs: [verify, test]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -224,19 +273,26 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ needs.verify.outputs.commit }}
+          ref: refs/tags/${{ needs.verify.outputs.tag }}
           persist-credentials: false
+      - name: L'arbre extrait est celui de l'étiquette vérifiée
+        env:
+          COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          if [ -z "$COMMIT" ] || [ "$(git rev-parse HEAD)" != "$COMMIT" ]; then
+            echo "::error::l'étiquette vise maintenant $(git rev-parse HEAD), la vérification portait sur ${COMMIT:-rien}"; exit 1
+          fi
+      # Pas de cache npm ici : rien qu'un autre travail aurait pu remplir n'entre à côté du jeton
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - name: wrangler à la version figée par package-lock.json
-        run: npm ci --no-audit --no-fund
+      - name: wrangler à la version figée par package-lock.json, SANS aucun script d'installation (revue M6)
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: host-release
-          path: ${{ runner.temp }}/release
-      - name: wrangler deploy du module publié, tel quel
+          name: host-module
+          path: ${{ runner.temp }}/module
+      - name: wrangler deploy du module rebâti, son empreinte revérifiée
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -246,10 +302,16 @@ jobs:
           CODE_HASH: ${{ needs.verify.outputs.code_hash }}
           DEPLOYED_AT: ${{ needs.verify.outputs.deployed_at }}
           ADVISORY: ${{ needs.verify.outputs.advisory }}
+          MODULE_SHA256: ${{ needs.verify.outputs.module_sha256 }}
         run: |
+          module="$RUNNER_TEMP/module/filarr-gate-host-$VERSION.js"
+          got="$(sha256sum "$module" | cut -d' ' -f1)"
+          if [ -z "$MODULE_SHA256" ] || [ "$got" != "$MODULE_SHA256" ]; then
+            echo "::error::le module transmis ($got) n'est pas celui de SHA256SUMS (${MODULE_SHA256:-rien})"; exit 1
+          fi
           set -- --var "HOST_CODE_HASH:$CODE_HASH" --var "HOST_BUILD_REF:$TAG" --var "HOST_DEPLOYED_AT:$DEPLOYED_AT"
           if [ -n "$ADVISORY" ]; then set -- "$@" --var "HOST_SECURITY_ADVISORY:$ADVISORY"; fi
-          npx wrangler deploy "$RUNNER_TEMP/release/filarr-gate-host-$VERSION.js" --no-bundle \
+          npx wrangler deploy "$RUNNER_TEMP/module/filarr-gate-host-$VERSION.js" --no-bundle \
             --config packages/host/wrangler.jsonc "$@"
       - name: L'annonce servie est celle de la publication
         env:

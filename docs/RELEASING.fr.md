@@ -232,6 +232,13 @@ Cloudflare n'existe que dans ce workflow.
   dépôt, aucun autre environnement.
 - `ADVISORY_READ_TOKEN` (étape 7 plus haut) est lu aussi par la mise en service, pour vérifier un avis de sécurité et
   lire sa gravité.
+- **Settings › Rules › Rulesets**, une règle sur la branche `release-journal` : poussée forcée bloquée, suppression
+  interdite, historique linéaire exigé, et mises à jour réservées à la chaîne (seul `github-actions[bot]` y pousse). La
+  mise en service le vérifie de toute façon (historique linéaire, chaque commit du robot, des lignes ajoutées
+  seulement, et l'activité du dépôt chez GitHub ne montre que des poussées du robot, sans poussée forcée ni
+  suppression), et refuse sinon.
+- Une règle sur `main` : demande de fusion obligatoire, **Require review from Code Owners** (`.github/CODEOWNERS`
+  couvre `.github/`, `scripts/release/`, `packages/host/` et `docs/hosted-keys.json`), ni poussée forcée ni suppression.
 
 ### À chaque mise en service
 
@@ -241,10 +248,14 @@ Cloudflare n'existe que dans ce workflow.
 2. Sept jours au moins après son entrée `published` dans `journal.jsonl` (branche `release-journal`).
 3. **Actions › Deploy hosted service › Run workflow**, depuis `main`, avec l'étiquette `vX.Y.Z`.
 
-Le workflow vérifie la signature de l'étiquette contre `release-signers` de la branche par défaut (deux fois), trouve
-l'entrée `published` de l'étiquette, télécharge le `SHA256SUMS` et le module de la version publiée, vérifie le module
-contre lui et le `codeHash` contre le journal, refuse avant sept jours, relance les essais sur le commit étiqueté et
-reconstruit le module octet pour octet, met en service **ce** fichier (`wrangler deploy --no-bundle`) avec
+Le workflow vérifie la signature de l'étiquette contre `release-signers` de la branche par défaut (deux fois), vérifie
+que le journal est celui de la chaîne (linéaire, écrit par `github-actions[bot]` seul, jamais réécrit), trouve
+l'UNIQUE entrée `published` de l'étiquette et la refuse si elle ne nomme pas le commit de l'étiquette signée,
+télécharge le `SHA256SUMS` et le module de la version publiée, vérifie le module contre lui et le `codeHash` contre le
+journal, refuse avant sept jours, extrait l'**étiquette** (`refs/tags/…`, jamais un commit lu au journal) pour relancer
+les essais et rebâtir le module, refuse si le module rebâti n'a pas le SHA-256 que `SHA256SUMS` annonce, transmet ce
+module rebâti par artefact au travail de mise en service (qui ne lance aucun script d'installation :
+`npm ci --ignore-scripts`, et revérifie le SHA-256), le met en service (`wrangler deploy --no-bundle`) avec
 `HOST_CODE_HASH`, `HOST_BUILD_REF` et `HOST_DEPLOYED_AT`, relit l'annonce servie à
 `https://ctl.gate.filarr.com/.well-known/filarr-gate-host.json`, et écrit l'entrée `deployed` du journal. Dans les cinq
 minutes, le service remet son annonce de version à l'API de Filarr, qui l'écrit au journal de chaque accès hébergé.

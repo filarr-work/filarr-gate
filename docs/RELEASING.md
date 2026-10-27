@@ -222,6 +222,12 @@ workflow.
   other environment.
 - `ADVISORY_READ_TOKEN` (step 7 above) is also read by the deployment, to check a security advisory and read its
   severity.
+- **Settings › Rules › Rulesets**, a ruleset on the branch `release-journal`: block force pushes, restrict deletions,
+  require a linear history, and restrict updates to the chain (only `github-actions[bot]` pushes there). The deployment
+  checks it anyway (linear history, every commit by the bot, lines only added, and the repository's activity at GitHub
+  shows only pushes of the bot, without force push nor deletion), and refuses otherwise.
+- A ruleset on `main`: pull request required, **Require review from Code Owners** (`.github/CODEOWNERS` covers
+  `.github/`, `scripts/release/`, `packages/host/` and `docs/hosted-keys.json`), no force push, no deletion.
 
 ### Each deployment
 
@@ -230,12 +236,16 @@ workflow.
 2. At least seven days after its `published` entry in `journal.jsonl` (branch `release-journal`).
 3. **Actions › Deploy hosted service › Run workflow**, from `main`, with the tag `vX.Y.Z`.
 
-The workflow checks the tag's signature against `release-signers` of the default branch (twice), finds the
-`published` entry of the tag, downloads the release's `SHA256SUMS` and the module, checks the module against it and the
-`codeHash` against the journal, refuses before seven days, runs the tests on the tagged commit and rebuilds the module
-byte for byte, deploys **that** file (`wrangler deploy --no-bundle`) with `HOST_CODE_HASH`, `HOST_BUILD_REF` and
-`HOST_DEPLOYED_AT`, reads back the announcement served at `https://ctl.gate.filarr.com/.well-known/filarr-gate-host.json`,
-and writes the `deployed` entry of the journal. Within five minutes, the service hands its version announcement to
+The workflow checks the tag's signature against `release-signers` of the default branch (twice), checks that the
+journal is the chain's (linear, written by `github-actions[bot]` only, never rewritten), finds the ONE `published`
+entry of the tag and refuses it unless it names the commit of the signed tag, downloads the release's `SHA256SUMS` and
+the module, checks the module against it and the `codeHash` against the journal, refuses before seven days, checks out
+the **tag** (`refs/tags/…`, never a commit read in the journal) to run the tests and rebuild the module, refuses unless
+the rebuilt module has the SHA-256 that `SHA256SUMS` lists, hands that rebuilt module by artifact to the deployment
+job (which runs no install script: `npm ci --ignore-scripts`, and checks the SHA-256 again), deploys it
+(`wrangler deploy --no-bundle`) with `HOST_CODE_HASH`, `HOST_BUILD_REF` and `HOST_DEPLOYED_AT`, reads back the
+announcement served at `https://ctl.gate.filarr.com/.well-known/filarr-gate-host.json`, and writes the `deployed` entry
+of the journal. Within five minutes, the service hands its version announcement to
 Filarr's API, which writes it in the log of every hosted access. Read the Cloudflare account's audit log after each
 deployment.
 
