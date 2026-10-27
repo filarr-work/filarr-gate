@@ -5,6 +5,11 @@
 Les changements notables de chaque version. Avant la 1.0, une version mineure peut changer l'API ; les notes de version
 le disent.
 
+## 0.3.2 : correctifs de sécurité de la revue interne
+
+- Service hébergé : correctif de comptage des appels.
+- Chaîne de mise en service liée à l'étiquette signée.
+
 ## 0.3.1 : publication npm par la seule publication de confiance
 
 - La chaîne de publication ne passe plus aucun jeton npm : elle publie par la seule publication de confiance (OIDC).

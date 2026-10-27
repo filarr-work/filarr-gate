@@ -112,7 +112,7 @@ scellé pour le nouveau jeton seulement ; une autre boîte noire ne peut pas l'o
 ```json
 { "v": 1, "kind": "filarr-gate-host/erasure", "keyId": "h1", "accessId": "…", "hostName": "site-vitrine-7qm2",
   "reason": "migrated", "stores": [{ "storeId": "…", "g": 4 }], "erased": ["token", "dbKeys", "copy", "state", "extdbKeys"],
-  "requestedAt": "…", "erasedAt": "…", "version": "0.3.1", "codeHash": "sha256:…" }
+  "requestedAt": "…", "erasedAt": "…", "version": "0.3.2", "codeHash": "sha256:…" }
 ```
 
 signé par la clé du service hébergé, gardé 5 ans au journal de l'accès, montré par les applis avec la génération d'après

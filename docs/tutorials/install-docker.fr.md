@@ -15,7 +15,7 @@ chaque palier change).
 - Un nom DNS qui pointe vers le serveur (`gate.example.com` ci-dessous), et les ports 80 et 443 ouverts, pour le
   certificat.
 - Le jeton `flr_live_…` de l'accès ([ouvrir une base à une API](open-a-database.fr.md)).
-- L'image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64) : `:0.3` suit les correctifs 0.3.x, `:0.3.1` fige
+- L'image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64) : `:0.3` suit les correctifs 0.3.x, `:0.3.2` fige
   cette version exacte. Elle est petite (Node 22, Alpine), tourne sous l'utilisateur non root `node`, garde tout dans
   `/data`, et contrôle sa propre santé. Elle est signée (cosign) et construite par la chaîne de publication du dépôt
   ([plan de publication](../release.fr.md)).
@@ -25,7 +25,7 @@ chaque palier change).
 ```sh
 mkdir filarr-gate && cd filarr-gate
 for f in docker-compose.yml Caddyfile example.env; do
-  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.3.1/examples/docker/$f"
+  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.3.2/examples/docker/$f"
 done
 cp example.env .env
 chmod 600 .env
@@ -46,7 +46,7 @@ jamais `.env`.
 ## 2. Le fichier Compose
 
 `examples/docker/docker-compose.yml`, la boîte noire (les commentaires de l'exemple disent, en anglais : `:0.3` suit les
-correctifs 0.3.x et `:0.3.1` fige cette version ; la variante qui construit l'image depuis un clone ; Caddy, sur le
+correctifs 0.3.x et `:0.3.2` fige cette version ; la variante qui construit l'image depuis un clone ; Caddy, sur le
 même réseau Docker, transmet l'adresse de l'appelant ; gardez ce volume, il tient l'état, le cache de blocs chiffrés,
 le journal et l'état chiffré des synchros ; l'interface de gestion sur CETTE machine seulement, car qui y entre lit les
 données ; l'API n'est pas publiée, seul Caddy la joint, sur le port 8443 du réseau) :
@@ -54,7 +54,7 @@ données ; l'API n'est pas publiée, seul Caddy la joint, sur le port 8443 du r�
 <!-- snippet: examples/docker/docker-compose.yml#gate -->
 ```yaml
 gate:
-  # `:0.3` follows the 0.3.x fixes; `:0.3.1` pins this exact version.
+  # `:0.3` follows the 0.3.x fixes; `:0.3.2` pins this exact version.
   image: ghcr.io/filarr-work/gate:0.3
   # Variant, from a clone of the repository: replace the line above with
   #   build:
@@ -203,7 +203,7 @@ Depuis un clone de ce dépôt, la même image que celle publiée :
 
 ```sh
 git clone https://github.com/filarr-work/filarr-gate.git && cd filarr-gate
-git checkout v0.3.1
+git checkout v0.3.2
 docker build -t filarr-gate:local .
 ```
 

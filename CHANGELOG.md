@@ -4,6 +4,11 @@
 
 The notable changes of each version. Before 1.0, a minor version may change the API; the release notes say so.
 
+## 0.3.2: security fixes from the internal review
+
+- Hosted service: fix to the counting of calls.
+- Deployment chain bound to the signed tag.
+
 ## 0.3.1: npm publication through trusted publishing only
 
 - The release chain no longer passes any npm token: it publishes through trusted publishing (OIDC) alone. 0.3.0 was
